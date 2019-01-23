@@ -31,7 +31,7 @@ export declare class Couchbase extends Common {
 
     addDatabaseChangeListener(callback: any): Promise<any>;
 
-    inBatch(batch: () => void): Promise<any>;
+    inBatch(batch: Promise<any>[]): Promise<any>;
 }
 
 export declare class Replicator extends ReplicatorBase {

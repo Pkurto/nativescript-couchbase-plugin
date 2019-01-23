@@ -88,16 +88,26 @@ export class Couchbase extends Common {
         });
     }
 
-    inBatch(batch: () => void): Promise<any> {
-        return new Promise<any>((resolve, reject) => {
+    inBatch(batch: Promise<any>[]): Promise<any> {
+        return new Promise((resolve, reject) => {
+            pendingRequests[requestIdCounter] = {
+                resolveCallback: resolve,
+                rejectCallback: reject
+            };
+
             const runnable = new java.lang.Runnable({
                 run: () => {
-                    batch();
-                    resolve();
+                    return Promise.all(batch).then(() => {
+                        console.log('batch is done');
+                    });
                 }
             });
 
-            this.android.inBatch(runnable);
+            ensureCompleteCallback();
+            this.android.inBatch(runnable, completeCallback, new java.lang.Integer(requestIdCounter));
+
+            // increment the id counter
+            requestIdCounter++;
         });
     }
 
@@ -128,7 +138,6 @@ export class Couchbase extends Common {
                 // increment the id counter
                 requestIdCounter++;
             } catch (e) {
-                console.error(e.message);
                 reject(e);
             }
         });
@@ -256,7 +265,9 @@ export class Couchbase extends Common {
                         resolve();
                     }
                 }),
-                rejectCallback: reject
+                rejectCallback: (e) => {
+                    reject(e);
+                }
             };
 
             ensureCompleteCallback();

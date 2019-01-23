@@ -7,6 +7,7 @@ import {
     ReplicatorBase
 } from './couchbase-plugin.common';
 import * as types from 'tns-core-modules/utils/types';
+import * as sp from 'synchronized-promise';
 
 export {
     Query, QueryMeta, QueryArrayOperator, QueryComparisonOperator, QueryLogicalOperator, QueryOrderItem, QueryWhereItem
@@ -37,10 +38,15 @@ export class Couchbase extends Common {
         return Promise.resolve();
     }
 
-    inBatch(batch: () => void): Promise<any> {
+    inBatch(batch: Promise<any>[]): Promise<any> {
         return new Promise<any>((resolve, reject) => {
             const errorRef = new interop.Reference();
-            this.ios.inBatchUsingBlock(errorRef, batch);
+            this.ios.inBatchUsingBlock(errorRef, () => {
+                return Promise.all(batch).then(() => {
+                    console.log('batch is done');
+                });
+            });
+
             resolve();
         });
     }

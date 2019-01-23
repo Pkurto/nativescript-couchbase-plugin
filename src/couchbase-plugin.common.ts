@@ -26,7 +26,7 @@ export abstract class Common {
 
     abstract addDatabaseChangeListener(callback: any): Promise<any>;
 
-    abstract inBatch(batch: () => void): Promise<any>;
+    abstract inBatch(batch: Promise<any>[]): Promise<any>;
 }
 
 export abstract class ReplicatorBase {

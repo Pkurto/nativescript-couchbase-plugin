@@ -4045,7 +4045,7 @@ declare module org {
 				public addChangeListener(param0: com.couchbase.lite.DatabaseChangeListener, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public delete(param0: com.couchbase.lite.Document, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public executeQuery(param0: com.couchbase.lite.Select, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
-				public inBatch(param0: java.lang.Runnable): void;
+				public inBatch(param0: java.lang.Runnable, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public getDocument(param0: string, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public save(param0: com.couchbase.lite.MutableDocument, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public static Open(param0: string, param1: com.couchbase.lite.DatabaseConfiguration, param2: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param3: any): void;
