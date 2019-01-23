@@ -59,7 +59,7 @@ function onRequestError(error: string, requestId: number) {
 
 export class Couchbase extends Common {
     config: any;
-    android: any;
+    android: org.nativescript.couchbaseplugin.ThreadedDatabase;
     name: string;
 
     constructor(name: string) {
@@ -68,15 +68,13 @@ export class Couchbase extends Common {
         this.config = new com.couchbase.lite.DatabaseConfiguration(
             utils.ad.getApplicationContext()
         );
-        this.android = new com.couchbase.lite.Database(name, this.config);
     }
 
     open(): Promise<any> {
         return new Promise((resolve, reject) => {
             pendingRequests[requestIdCounter] = {
                 resolveCallback: (db) => {
-                    console.log(db);
-                    console.log(db.cb);
+                    this.android = db;
                     resolve();
                 },
                 rejectCallback: reject
@@ -90,35 +88,50 @@ export class Couchbase extends Common {
         });
     }
 
-    inBatch(batch: () => void) {
-        const runnable = new java.lang.Runnable({
-            run: () => {
-                batch();
-            }
-        });
+    inBatch(batch: () => void): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            const runnable = new java.lang.Runnable({
+                run: () => {
+                    batch();
+                    resolve();
+                }
+            });
 
-        this.android.inBatch(runnable);
+            this.android.inBatch(runnable);
+        });
     }
 
-    createDocument(data: Object, documentId?: string) {
-        try {
-            let doc;
-            if (documentId) {
-                doc = new com.couchbase.lite.MutableDocument(documentId);
-            } else {
-                doc = new com.couchbase.lite.MutableDocument();
+    createDocument(data: Object, documentId?: string): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            try {
+                let doc;
+                if (documentId) {
+                    doc = new com.couchbase.lite.MutableDocument(documentId);
+                } else {
+                    doc = new com.couchbase.lite.MutableDocument();
+                }
+                const keys = Object.keys(data);
+                for (let key of keys) {
+                    const item = data[key];
+                    this.serialize(item, doc, key);
+                }
+                pendingRequests[requestIdCounter] = {
+                    resolveCallback: () => {
+                        resolve(doc.getId());
+                    },
+                    rejectCallback: reject
+                };
+
+                ensureCompleteCallback();
+                this.android.save(doc, completeCallback, new java.lang.Integer(requestIdCounter));
+
+                // increment the id counter
+                requestIdCounter++;
+            } catch (e) {
+                console.error(e.message);
+                reject(e);
             }
-            const keys = Object.keys(data);
-            for (let key of keys) {
-                const item = data[key];
-                this.serialize(item, doc, key);
-            }
-            this.android.save(doc);
-            return doc.getId();
-        } catch (e) {
-            console.error(e.message);
-            return null;
-        }
+        });
     }
 
     private deserialize(data: any) {
@@ -169,26 +182,33 @@ export class Couchbase extends Common {
         }
     }
 
-    getDocument(documentId: string): any {
-        try {
-            const doc = this.android.getDocument(documentId);
-            if (!doc) return null;
-            const keys = doc.getKeys();
-            const size = keys.size();
-            let object = {};
-            object['id'] = doc.getId();
-            for (let i = 0; i < size; i++) {
-                const key = keys.get(i);
-                const nativeItem = doc.getValue(key);
-                const newItem = {};
-                newItem[key] = this.deserialize(nativeItem);
-                object = Object.assign(object, newItem);
-            }
-            return object;
-        } catch (e) {
-            console.error(e.message);
-            return null;
-        }
+    getDocument(documentId: string): Promise<any> {
+        return new Promise((resolve, reject) => {
+            pendingRequests[requestIdCounter] = {
+                resolveCallback: ((doc) => {
+                    if (!doc) return resolve(null);
+                    const keys = doc.getKeys();
+                    const size = keys.size();
+                    let object = {};
+                    object['id'] = doc.getId();
+                    for (let i = 0; i < size; i++) {
+                        const key = keys.get(i);
+                        const nativeItem = doc.getValue(key);
+                        const newItem = {};
+                        newItem[key] = this.deserialize(nativeItem);
+                        object = Object.assign(object, newItem);
+                    }
+                    return resolve(object);
+                }),
+                rejectCallback: reject
+            };
+
+            ensureCompleteCallback();
+            this.android.getDocument(documentId, completeCallback, new java.lang.Integer(requestIdCounter));
+
+            // increment the id counter
+            requestIdCounter++;
+        });
     }
 
     private fromISO8601UTC(date: string) {
@@ -210,23 +230,41 @@ export class Couchbase extends Common {
         return dateFormat.format(date);
     }
 
-    updateDocument(documentId: string, data: any) {
-        try {
-            const origin = this.android.getDocument(
-                documentId
-            ) as com.couchbase.lite.Document;
-            if (origin) {
-                const doc = origin.toMutable();
-                const keys = Object.keys(data);
-                for (let key of keys) {
-                    const item = data[key];
-                    this.serialize(item, doc, key);
-                }
-                this.android.save(doc);
-            }
-        } catch (e) {
-            console.error(e.message);
-        }
+    updateDocument(documentId: string, data: any): Promise<any> {
+        return new Promise((resolve, reject) => {
+            pendingRequests[requestIdCounter] = {
+                resolveCallback: ((origin) => {
+                    if (origin) {
+                        const doc = origin.toMutable();
+                        const keys = Object.keys(data);
+                        for (let key of keys) {
+                            const item = data[key];
+                            this.serialize(item, doc, key);
+                        }
+
+                        pendingRequests[requestIdCounter] = {
+                            resolveCallback: resolve,
+                            rejectCallback: reject
+                        };
+
+                        ensureCompleteCallback();
+                        this.android.save(doc, completeCallback, new java.lang.Integer(requestIdCounter));
+
+                        // increment the id counter
+                        requestIdCounter++;
+                    } else {
+                        resolve();
+                    }
+                }),
+                rejectCallback: reject
+            };
+
+            ensureCompleteCallback();
+            this.android.getDocument(documentId, completeCallback, new java.lang.Integer(requestIdCounter));
+
+            // increment the id counter
+            requestIdCounter++;
+        });
     }
 
     private serializeObject(item, object, key) {
@@ -282,7 +320,7 @@ export class Couchbase extends Common {
 
     private serializeArray(item, array: any) {
         if (item === null) {
-            return
+            return;
         }
 
         switch (typeof item) {
@@ -390,22 +428,49 @@ export class Couchbase extends Common {
         return item < -Math.pow(2, 31) + 1 || item > Math.pow(2, 31) - 1;
     }
 
-    deleteDocument(documentId: string) {
-        try {
-            const doc = this.android.getDocument(documentId);
-            return this.android.delete(doc);
-        } catch (e) {
-            console.error(e.message);
-            return false;
-        }
+    deleteDocument(documentId: string): Promise<any> {
+        return new Promise((resolve, reject) => {
+            pendingRequests[requestIdCounter] = {
+                resolveCallback: ((doc) => {
+                    if (doc) {
+                        pendingRequests[requestIdCounter] = {
+                            resolveCallback: resolve,
+                            rejectCallback: reject
+                        };
+
+                        ensureCompleteCallback();
+                        this.android.delete(doc, completeCallback, new java.lang.Integer(requestIdCounter));
+
+                        // increment the id counter
+                        requestIdCounter++;
+                    } else {
+                        resolve();
+                    }
+                }),
+                rejectCallback: reject
+            };
+
+            ensureCompleteCallback();
+            this.android.getDocument(documentId, completeCallback, new java.lang.Integer(requestIdCounter));
+
+            // increment the id counter
+            requestIdCounter++;
+        });
     }
 
     destroyDatabase() {
-        try {
-            this.android.delete();
-        } catch (e) {
-            console.error(e.message);
-        }
+        return new Promise((resolve, reject) => {
+            pendingRequests[requestIdCounter] = {
+                resolveCallback: resolve,
+                rejectCallback: reject
+            };
+
+            ensureCompleteCallback();
+            this.android.delete(completeCallback, new java.lang.Integer(requestIdCounter));
+
+            // increment the id counter
+            requestIdCounter++;
+        });
     }
 
     private setComparision(item) {
@@ -525,130 +590,142 @@ export class Couchbase extends Common {
         return nativeQuery;
     }
 
-    query(query: Query = {select: [QueryMeta.ALL, QueryMeta.ID]}) {
-        const items = [];
-        let select = [];
-        if (!query.select || query.select.length === 0) {
-            select.push(com.couchbase.lite.SelectResult.all());
-            select.push(
-                com.couchbase.lite.SelectResult.expression(com.couchbase.lite.Meta.id)
-            );
-        } else {
-            query.select.forEach(item => {
-                if (item === QueryMeta.ID) {
-                    select.push(
-                        com.couchbase.lite.SelectResult.expression(
-                            com.couchbase.lite.Meta.id
-                        )
-                    );
-                } else if (item === QueryMeta.ALL) {
-                    select.push(com.couchbase.lite.SelectResult.all());
-                } else {
-                    select.push(com.couchbase.lite.SelectResult.property(item));
-                }
-            });
-        }
-        let queryBuilder: any = com.couchbase.lite.QueryBuilder.select(select);
-        if (query.from) {
-            const db = new Couchbase(query.from);
-            queryBuilder = queryBuilder.from(
-                com.couchbase.lite.DataSource.database(db.android)
-            );
-        } else {
-            queryBuilder = queryBuilder.from(
-                com.couchbase.lite.DataSource.database(this.android)
-            );
-        }
-
-        let nativeQuery = null;
-        if (query.where) {
-            for (let item of query.where) {
-                if (item.logical === QueryLogicalOperator.AND) {
-                    if (!nativeQuery) break;
-                    nativeQuery = nativeQuery.and(this.setComparision(item));
-                } else if (item.logical === QueryLogicalOperator.OR) {
-                    if (!nativeQuery) break;
-                    nativeQuery = nativeQuery.or(this.setComparision(item));
-                } else {
-                    nativeQuery = this.setComparision(item);
-                }
-            }
-            if (nativeQuery) {
-                queryBuilder = queryBuilder.where(nativeQuery);
-            }
-        }
-        if (query.groupBy) {
-            const groupBy = [];
-            for (let prop of query.groupBy) {
-                groupBy.push(com.couchbase.lite.Expression.property(prop));
-            }
-            if (groupBy.length > 0) {
-                queryBuilder = queryBuilder.groupBy(groupBy);
-            }
-        }
-        if (query.order) {
-            const orderBy = [];
-            for (let item of query.order) {
-                switch (item.direction) {
-                    case 'desc':
-                        orderBy.push(
-                            com.couchbase.lite.Ordering.property(item.property).descending()
-                        );
-                        break;
-                    default:
-                        orderBy.push(
-                            com.couchbase.lite.Ordering.property(item.property).ascending()
-                        );
-                        break;
-                }
-            }
-            if (orderBy.length > 0) {
-                queryBuilder = queryBuilder.orderBy(orderBy);
-            }
-        }
-
-        if (query.limit && typeof query.limit === 'number') {
-            if (query.offset && typeof query.offset === 'number') {
-                queryBuilder = queryBuilder.limit(
-                    com.couchbase.lite.Expression.intValue(query.limit),
-                    com.couchbase.lite.Expression.intValue(query.offset)
+    query(query: Query = {select: [QueryMeta.ALL, QueryMeta.ID]}): Promise<any> {
+        return new Promise((resolve, reject) => {
+            let select = [];
+            if (!query.select || query.select.length === 0) {
+                select.push(com.couchbase.lite.SelectResult.all());
+                select.push(
+                    com.couchbase.lite.SelectResult.expression(com.couchbase.lite.Meta.id)
                 );
             } else {
-                queryBuilder = queryBuilder.limit(
-                    com.couchbase.lite.Expression.intValue(query.limit)
+                query.select.forEach(item => {
+                    if (item === QueryMeta.ID) {
+                        select.push(
+                            com.couchbase.lite.SelectResult.expression(
+                                com.couchbase.lite.Meta.id
+                            )
+                        );
+                    } else if (item === QueryMeta.ALL) {
+                        select.push(com.couchbase.lite.SelectResult.all());
+                    } else {
+                        select.push(com.couchbase.lite.SelectResult.property(item));
+                    }
+                });
+            }
+            let queryBuilder: any = com.couchbase.lite.QueryBuilder.select(select);
+            if (query.from) {
+                const db = new Couchbase(query.from);
+                queryBuilder = queryBuilder.from(
+                    com.couchbase.lite.DataSource.database(db.android)
+                );
+            } else {
+                queryBuilder = queryBuilder.from(
+                    com.couchbase.lite.DataSource.database(this.android.db)
                 );
             }
-        }
 
-        const result = queryBuilder.execute().allResults();
-        const size = result.size();
-        for (let i = 0; i < size; i++) {
-            const item = result.get(i);
-            const keys = item.getKeys();
-            const keysSize = keys.size();
-            const obj = {};
-            for (let keyId = 0; keyId < keysSize; keyId++) {
-                const key = keys.get(keyId);
-                const nativeItem = item.getValue(key);
-                if (typeof nativeItem === 'string') {
-                    obj[key] = nativeItem;
-                } else if (
-                    nativeItem &&
-                    nativeItem.getClass() &&
-                    nativeItem.getClass().getName() === 'com.couchbase.lite.Dictionary'
-                ) {
-                    const cblKeys = nativeItem.getKeys();
-                    const cblKeysSize = cblKeys.size();
-                    for (let cblKeysId = 0; cblKeysId < cblKeysSize; cblKeysId++) {
-                        const cblKey = cblKeys.get(cblKeysId);
-                        obj[cblKey] = this.deserialize(nativeItem.getValue(cblKey));
+            let nativeQuery = null;
+            if (query.where) {
+                for (let item of query.where) {
+                    if (item.logical === QueryLogicalOperator.AND) {
+                        if (!nativeQuery) break;
+                        nativeQuery = nativeQuery.and(this.setComparision(item));
+                    } else if (item.logical === QueryLogicalOperator.OR) {
+                        if (!nativeQuery) break;
+                        nativeQuery = nativeQuery.or(this.setComparision(item));
+                    } else {
+                        nativeQuery = this.setComparision(item);
                     }
                 }
+                if (nativeQuery) {
+                    queryBuilder = queryBuilder.where(nativeQuery);
+                }
             }
-            items.push(obj);
-        }
+            if (query.groupBy) {
+                const groupBy = [];
+                for (let prop of query.groupBy) {
+                    groupBy.push(com.couchbase.lite.Expression.property(prop));
+                }
+                if (groupBy.length > 0) {
+                    queryBuilder = queryBuilder.groupBy(groupBy);
+                }
+            }
+            if (query.order) {
+                const orderBy = [];
+                for (let item of query.order) {
+                    switch (item.direction) {
+                        case 'desc':
+                            orderBy.push(
+                                com.couchbase.lite.Ordering.property(item.property).descending()
+                            );
+                            break;
+                        default:
+                            orderBy.push(
+                                com.couchbase.lite.Ordering.property(item.property).ascending()
+                            );
+                            break;
+                    }
+                }
+                if (orderBy.length > 0) {
+                    queryBuilder = queryBuilder.orderBy(orderBy);
+                }
+            }
 
-        return items;
+            if (query.limit && typeof query.limit === 'number') {
+                if (query.offset && typeof query.offset === 'number') {
+                    queryBuilder = queryBuilder.limit(
+                        com.couchbase.lite.Expression.intValue(query.limit),
+                        com.couchbase.lite.Expression.intValue(query.offset)
+                    );
+                } else {
+                    queryBuilder = queryBuilder.limit(
+                        com.couchbase.lite.Expression.intValue(query.limit)
+                    );
+                }
+            }
+
+            pendingRequests[requestIdCounter] = {
+                resolveCallback: (result) => {
+                    const items = [];
+                    const size = result.size();
+                    for (let i = 0; i < size; i++) {
+                        const item = result.get(i);
+                        const keys = item.getKeys();
+                        const keysSize = keys.size();
+                        const obj = {};
+                        for (let keyId = 0; keyId < keysSize; keyId++) {
+                            const key = keys.get(keyId);
+                            const nativeItem = item.getValue(key);
+                            if (typeof nativeItem === 'string') {
+                                obj[key] = nativeItem;
+                            } else if (
+                                nativeItem &&
+                                nativeItem.getClass() &&
+                                nativeItem.getClass().getName() === 'com.couchbase.lite.Dictionary'
+                            ) {
+                                const cblKeys = nativeItem.getKeys();
+                                const cblKeysSize = cblKeys.size();
+                                for (let cblKeysId = 0; cblKeysId < cblKeysSize; cblKeysId++) {
+                                    const cblKey = cblKeys.get(cblKeysId);
+                                    obj[cblKey] = this.deserialize(nativeItem.getValue(cblKey));
+                                }
+                            }
+                        }
+                        items.push(obj);
+                    }
+
+                    resolve(items);
+                },
+                rejectCallback: reject
+            };
+
+            ensureCompleteCallback();
+            this.android.executeQuery(queryBuilder, completeCallback, new java.lang.Integer(requestIdCounter));
+
+            // increment the id counter
+            requestIdCounter++;
+        });
     }
 
     createPullReplication(
@@ -682,22 +759,34 @@ export class Couchbase extends Common {
         return new Replicator(replicator);
     }
 
-    addDatabaseChangeListener(callback: any) {
-        const listener = co.fitcom.fancycouchbase.TNSDatabaseChangeListener.extend({
-            onChange(changes: any): void {
-                if (callback && typeof callback === 'function') {
-                    const ids = [];
-                    const documentIds = changes.getDocumentIDs();
-                    const size = documentIds.size();
-                    for (let i = 0; i < size; i++) {
-                        const item = documentIds.get(i);
-                        ids.push(item);
+    addDatabaseChangeListener(callback: any): Promise<any> {
+        return new Promise((resolve, reject) => {
+            const listener = co.fitcom.fancycouchbase.TNSDatabaseChangeListener.extend({
+                onChange(changes: any): void {
+                    if (callback && typeof callback === 'function') {
+                        const ids = [];
+                        const documentIds = changes.getDocumentIDs();
+                        const size = documentIds.size();
+                        for (let i = 0; i < size; i++) {
+                            const item = documentIds.get(i);
+                            ids.push(item);
+                        }
+                        callback(ids);
                     }
-                    callback(ids);
                 }
-            }
+            });
+
+            pendingRequests[requestIdCounter] = {
+                resolveCallback: resolve,
+                rejectCallback: reject
+            };
+
+            ensureCompleteCallback();
+            this.android.addChangeListener(new listener(), completeCallback, new java.lang.Integer(requestIdCounter));
+
+            // increment the id counter
+            requestIdCounter++;
         });
-        this.android.addChangeListener(new listener());
     }
 }
 

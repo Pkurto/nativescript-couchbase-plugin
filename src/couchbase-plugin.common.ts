@@ -8,25 +8,25 @@ export abstract class Common {
 
     abstract open(): Promise<any>;
 
-    abstract createDocument(data: Object, documentId?: string);
+    abstract createDocument(data: Object, documentId?: string): Promise<any>;
 
-    abstract getDocument(documentId: string);
+    abstract getDocument(documentId: string): Promise<any>;
 
-    abstract updateDocument(documentId: string, data: any);
+    abstract updateDocument(documentId: string, data: any): Promise<any>;
 
-    abstract deleteDocument(documentId: string);
+    abstract deleteDocument(documentId: string): Promise<any>;
 
-    abstract destroyDatabase();
+    abstract destroyDatabase(): Promise<any>;
 
-    abstract query(query: Query): any[];
+    abstract query(query: Query): Promise<any[]>;
 
     abstract createPullReplication(remoteUrl: string);
 
     abstract createPushReplication(remoteUrl: string);
 
-    abstract addDatabaseChangeListener(callback: any);
+    abstract addDatabaseChangeListener(callback: any): Promise<any>;
 
-    abstract inBatch(batch: () => void);
+    abstract inBatch(batch: () => void): Promise<any>;
 }
 
 export abstract class ReplicatorBase {

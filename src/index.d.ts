@@ -13,25 +13,25 @@ export declare class Couchbase extends Common {
 
     open(): Promise<any>;
 
-    createDocument(data: Object, documentId?: string): any;
+    createDocument(data: Object, documentId?: string): Promise<any>;
 
-    getDocument(documentId: string): any;
+    getDocument(documentId: string): Promise<any>;
 
-    updateDocument(documentId: string, data: any): void;
+    updateDocument(documentId: string, data: any): Promise<any>;
 
-    deleteDocument(documentId: string): any;
+    deleteDocument(documentId: string): Promise<any>;
 
-    destroyDatabase(): void;
+    destroyDatabase(): Promise<any>;
 
-    query(query?: Query): any[];
+    query(query?: Query): Promise<any[]>;
 
     createPullReplication(remoteUrl: string, username?: string, password?: string): Replicator;
 
     createPushReplication(remoteUrl: string, username?: string, password?: string): Replicator;
 
-    addDatabaseChangeListener(callback: any): void;
+    addDatabaseChangeListener(callback: any): Promise<any>;
 
-    inBatch(batch: () => void): void;
+    inBatch(batch: () => void): Promise<any>;
 }
 
 export declare class Replicator extends ReplicatorBase {

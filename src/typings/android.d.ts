@@ -4042,21 +4042,19 @@ declare module org {
 			export class ThreadedDatabase {
 				public static class: java.lang.Class<org.nativescript.couchbaseplugin.ThreadedDatabase>;
 				public db: com.couchbase.lite.Database;
+				public addChangeListener(param0: com.couchbase.lite.DatabaseChangeListener, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
+				public delete(param0: com.couchbase.lite.Document, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
+				public executeQuery(param0: com.couchbase.lite.Select, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
+				public inBatch(param0: java.lang.Runnable): void;
+				public getDocument(param0: string, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
+				public save(param0: com.couchbase.lite.MutableDocument, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public static Open(param0: string, param1: com.couchbase.lite.DatabaseConfiguration, param2: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param3: any): void;
-			}
-			export module ThreadedDatabase {
-				export class OpenDatabaseTask {
-					public static class: java.lang.Class<org.nativescript.couchbaseplugin.ThreadedDatabase.OpenDatabaseTask>;
-					public doInBackground(param0: string, param1: com.couchbase.lite.DatabaseConfiguration): org.nativescript.couchbaseplugin.ThreadedDatabase;
-					public onPostExecute(param0: org.nativescript.couchbaseplugin.ThreadedDatabase): void;
-					public onPostExecute(param0: java.lang.Exception): void;
-					public constructor(param0: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param1: any);
-				}
+				public delete(param0: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param1: any): void;
+				public executeQuery(param0: com.couchbase.lite.Query, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 			}
 		}
 	}
 }
-
 
 //Generics information:
 //com.couchbase.lite.ChangeListener:1

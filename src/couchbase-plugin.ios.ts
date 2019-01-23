@@ -37,26 +37,31 @@ export class Couchbase extends Common {
         return Promise.resolve();
     }
 
-    inBatch(batch: () => void) {
-        const errorRef = new interop.Reference();
-        this.ios.inBatchUsingBlock(errorRef, batch);
+    inBatch(batch: () => void): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            const errorRef = new interop.Reference();
+            this.ios.inBatchUsingBlock(errorRef, batch);
+            resolve();
+        });
     }
 
-    createDocument(data: Object, documentId?: string) {
-        let doc;
-        if (documentId) {
-            doc = CBLMutableDocument.alloc().initWithID(documentId);
-        } else {
-            doc = CBLMutableDocument.alloc().init();
-        }
+    createDocument(data: Object, documentId?: string): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            let doc;
+            if (documentId) {
+                doc = CBLMutableDocument.alloc().initWithID(documentId);
+            } else {
+                doc = CBLMutableDocument.alloc().init();
+            }
 
-        const keys = Object.keys(data);
-        for (let key of keys) {
-            const item = data[key];
-            this.serialize(item, doc, key);
-        }
-        this.ios.saveDocumentError(doc);
-        return doc.id;
+            const keys = Object.keys(data);
+            for (let key of keys) {
+                const item = data[key];
+                this.serialize(item, doc, key);
+            }
+            this.ios.saveDocumentError(doc);
+            resolve(doc.id);
+        });
     }
 
     private fromISO8601UTC(date: string) {
@@ -218,23 +223,25 @@ export class Couchbase extends Common {
         }
     }
 
-    getDocument(documentId: string): any {
-        const doc = this.ios.documentWithID(documentId);
-        if (doc) {
-            let obj = {};
-            const keys = doc.keys;
-            const size = keys.count;
-            obj['id'] = doc.id;
-            for (let i = 0; i < size; i++) {
-                const key = keys.objectAtIndex(i);
-                const value = doc.valueForKey(key);
-                const newValue = {};
-                newValue[key] = this.deserialize(value);
-                obj = Object.assign(obj, newValue);
+    getDocument(documentId: string): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            const doc = this.ios.documentWithID(documentId);
+            if (doc) {
+                let obj = {};
+                const keys = doc.keys;
+                const size = keys.count;
+                obj['id'] = doc.id;
+                for (let i = 0; i < size; i++) {
+                    const key = keys.objectAtIndex(i);
+                    const value = doc.valueForKey(key);
+                    const newValue = {};
+                    newValue[key] = this.deserialize(value);
+                    obj = Object.assign(obj, newValue);
+                }
+                return resolve(obj);
             }
-            return obj;
-        }
-        return null;
+            return resolve(null);
+        });
     }
 
     numberHasDecimals(item: number) {
@@ -282,24 +289,33 @@ export class Couchbase extends Common {
         return data;
     }
 
-    updateDocument(documentId: string, data: any) {
-        const original = this.ios.documentWithID(documentId);
-        const newDoc = original.toMutable();
-        const keys = Object.keys(data);
-        for (let key of keys) {
-            const item = data[key];
-            newDoc.setValueForKey(item, key);
-        }
-        this.ios.saveDocumentError(newDoc);
+    updateDocument(documentId: string, data: any): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            const original = this.ios.documentWithID(documentId);
+            const newDoc = original.toMutable();
+            const keys = Object.keys(data);
+            for (let key of keys) {
+                const item = data[key];
+                newDoc.setValueForKey(item, key);
+            }
+            this.ios.saveDocumentError(newDoc);
+            resolve();
+        });
     }
 
-    deleteDocument(documentId: string) {
-        const doc = this.ios.documentWithID(documentId);
-        return this.ios.deleteDocumentError(doc);
+    deleteDocument(documentId: string): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            const doc = this.ios.documentWithID(documentId);
+            this.ios.deleteDocumentError(doc);
+            resolve();
+        });
     }
 
-    destroyDatabase() {
-        return this.ios.delete();
+    destroyDatabase(): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            this.ios.delete();
+            resolve();
+        });
     }
 
     createPullReplication(
@@ -334,18 +350,21 @@ export class Couchbase extends Common {
         return new Replicator(replicator);
     }
 
-    addDatabaseChangeListener(callback: any) {
-        this.ios.addChangeListener((change: any) => {
-            if (callback && typeof callback === 'function') {
-                const ids = [];
-                const documentIds = change.documentIDs;
-                const size = documentIds.count;
-                for (let i = 0; i < size; i++) {
-                    const item = documentIds[i];
-                    ids.push(item);
+    addDatabaseChangeListener(callback: any): Promise<any> {
+        return new Promise((resolve, reject) => {
+            this.ios.addChangeListener((change: any) => {
+                if (callback && typeof callback === 'function') {
+                    const ids = [];
+                    const documentIds = change.documentIDs;
+                    const size = documentIds.count;
+                    for (let i = 0; i < size; i++) {
+                        const item = documentIds[i];
+                        ids.push(item);
+                    }
+                    callback(ids);
                 }
-                callback(ids);
-            }
+            });
+            resolve();
         });
     }
 
@@ -463,7 +482,7 @@ export class Couchbase extends Common {
         return nativeQuery;
     }
 
-    query(query: Query = {select: [QueryMeta.ALL, QueryMeta.ID]}) {
+    query(query: Query = {select: [QueryMeta.ALL, QueryMeta.ID]}): Promise<any> {
         const items = [];
         let select = [];
         let from;
@@ -576,7 +595,7 @@ export class Couchbase extends Common {
             }
             items.push(obj);
         }
-        return items;
+        return Promise.resolve(items);
     }
 }
 
