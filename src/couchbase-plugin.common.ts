@@ -6,6 +6,8 @@ export abstract class Common {
     constructor(databaseName: string) {
     }
 
+    abstract open(): Promise<any>;
+
     abstract createDocument(data: Object, documentId?: string);
 
     abstract getDocument(documentId: string);

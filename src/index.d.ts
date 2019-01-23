@@ -11,6 +11,8 @@ export declare class Couchbase extends Common {
 
     constructor(name: string);
 
+    open(): Promise<any>;
+
     createDocument(data: Object, documentId?: string): any;
 
     getDocument(documentId: string): any;

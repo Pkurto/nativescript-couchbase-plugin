@@ -21,16 +21,73 @@ export {
 
 declare var com, co;
 
+let requestIdCounter = 0;
+const pendingRequests = {};
+
+let completeCallback: org.nativescript.couchbaseplugin.Threaded.CompleteCallback;
+function ensureCompleteCallback() {
+    if (completeCallback) {
+        return;
+    }
+
+    completeCallback = new org.nativescript.couchbaseplugin.Threaded.CompleteCallback({
+        onComplete: function (result: any, context: any) {
+            // as a context we will receive the id of the request
+            onRequestComplete(context, result);
+        },
+        onError: function (error: string, context: any) {
+            onRequestError(error, context);
+        },
+    });
+}
+
+function onRequestComplete(requestId: number, result: any) {
+    const callbacks = pendingRequests[requestId];
+    delete pendingRequests[requestId];
+    if (callbacks) {
+        callbacks.resolveCallback(result);
+    }
+}
+
+function onRequestError(error: string, requestId: number) {
+    const callbacks = pendingRequests[requestId];
+    delete pendingRequests[requestId];
+    if (callbacks) {
+        callbacks.rejectCallback(new Error(error));
+    }
+}
+
 export class Couchbase extends Common {
     config: any;
     android: any;
+    name: string;
 
     constructor(name: string) {
         super(name);
+        this.name = name;
         this.config = new com.couchbase.lite.DatabaseConfiguration(
             utils.ad.getApplicationContext()
         );
         this.android = new com.couchbase.lite.Database(name, this.config);
+    }
+
+    open(): Promise<any> {
+        return new Promise((resolve, reject) => {
+            pendingRequests[requestIdCounter] = {
+                resolveCallback: (db) => {
+                    console.log(db);
+                    console.log(db.cb);
+                    resolve();
+                },
+                rejectCallback: reject
+            };
+
+            ensureCompleteCallback();
+            org.nativescript.couchbaseplugin.ThreadedDatabase.Open(this.name, this.config, completeCallback, new java.lang.Integer(requestIdCounter));
+
+            // increment the id counter
+            requestIdCounter++;
+        });
     }
 
     inBatch(batch: () => void) {

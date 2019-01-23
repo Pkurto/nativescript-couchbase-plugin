@@ -4005,6 +4005,59 @@ declare module okhttp3 {
 	}
 }
 
+declare module org {
+	export module nativescript {
+		export module couchbaseplugin {
+			export class Threaded {
+				public static class: java.lang.Class<org.nativescript.couchbaseplugin.Threaded>;
+				public constructor();
+			}
+			export module Threaded {
+				export class CompleteCallback {
+					public static class: java.lang.Class<org.nativescript.couchbaseplugin.Threaded.CompleteCallback>;
+					/**
+					 * Constructs a new instance of the org.nativescript.couchbaseplugin.Threaded$CompleteCallback interface with the provided implementation. An empty constructor exists calling super() when extending the interface class.
+					 */
+					public constructor(implementation: {
+						onComplete(param0: any, param1: any): void;
+						onError(param0: string, param1: any): void;
+					});
+					public constructor();
+					public onComplete(param0: any, param1: any): void;
+					public onError(param0: string, param1: any): void;
+				}
+				export class PriorityThreadFactory {
+					public static class: java.lang.Class<org.nativescript.couchbaseplugin.Threaded.PriorityThreadFactory>;
+					public newThread(param0: java.lang.Runnable): java.lang.Thread;
+					public constructor(param0: number);
+				}
+			}
+		}
+	}
+}
+
+declare module org {
+	export module nativescript {
+		export module couchbaseplugin {
+			export class ThreadedDatabase {
+				public static class: java.lang.Class<org.nativescript.couchbaseplugin.ThreadedDatabase>;
+				public db: com.couchbase.lite.Database;
+				public static Open(param0: string, param1: com.couchbase.lite.DatabaseConfiguration, param2: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param3: any): void;
+			}
+			export module ThreadedDatabase {
+				export class OpenDatabaseTask {
+					public static class: java.lang.Class<org.nativescript.couchbaseplugin.ThreadedDatabase.OpenDatabaseTask>;
+					public doInBackground(param0: string, param1: com.couchbase.lite.DatabaseConfiguration): org.nativescript.couchbaseplugin.ThreadedDatabase;
+					public onPostExecute(param0: org.nativescript.couchbaseplugin.ThreadedDatabase): void;
+					public onPostExecute(param0: java.lang.Exception): void;
+					public constructor(param0: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param1: any);
+				}
+			}
+		}
+	}
+}
+
+
 //Generics information:
 //com.couchbase.lite.ChangeListener:1
 //com.couchbase.lite.ChangeListenerToken:1
