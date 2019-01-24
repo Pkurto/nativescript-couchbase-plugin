@@ -10,11 +10,21 @@ export abstract class Common {
 
     abstract createDocument(data: Object, documentId?: string): Promise<any>;
 
+    abstract createDocumentBatchAction(data: Object, documentId?: string): Promise<BatchAction>;
+
     abstract getDocument(documentId: string): Promise<any>;
 
     abstract updateDocument(documentId: string, data: any): Promise<any>;
 
+    abstract updateDocumentBatchAction(documentId: string, data: any): Promise<BatchAction>;
+
+    abstract upsertDocument(documentId: string, data: any): Promise<any>;
+
+    abstract upsertDocumentBatchAction(documentId: string, data: any): Promise<BatchAction>;
+
     abstract deleteDocument(documentId: string): Promise<any>;
+
+    abstract deleteDocumentBatchAction(documentId: string): Promise<BatchAction>;
 
     abstract destroyDatabase(): Promise<any>;
 
@@ -26,7 +36,19 @@ export abstract class Common {
 
     abstract addDatabaseChangeListener(callback: any): Promise<any>;
 
-    abstract inBatch(batch: Promise<any>[]): Promise<any>;
+    abstract inBatch(batch: BatchAction[]): Promise<any>;
+}
+
+export enum BatchActionType {
+    CREATE = 'CREATE',
+    UPDATE = 'UPDATE',
+    DELETE = 'DELETE'
+}
+
+export class BatchAction {
+    ios: any;
+    android: any;
+    type: BatchActionType;
 }
 
 export abstract class ReplicatorBase {

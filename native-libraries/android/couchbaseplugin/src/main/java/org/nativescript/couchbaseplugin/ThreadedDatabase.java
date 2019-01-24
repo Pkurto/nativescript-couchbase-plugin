@@ -111,7 +111,7 @@ public class ThreadedDatabase {
         }
     }
 
-    public void inBatch(final java.lang.Runnable runnable, final Threaded.CompleteCallback callback, final Object context) {
+    public void inBatch(final List<BatchAction> ActionList, final Threaded.CompleteCallback callback, final Object context) {
         final android.os.Handler mHandler = new android.os.Handler();
         final Database db = this.db;
         Threaded.threadPoolExecutor().execute(new Runnable() {
@@ -119,7 +119,7 @@ public class ThreadedDatabase {
             public void run() {
                 final ThreadedDatabase.BatchTask task = new ThreadedDatabase.BatchTask(callback, context);
                 try {
-                    task.doInBackground(db, runnable);
+                    task.doInBackground(db, ActionList);
                     mHandler.post(new Runnable() {
                         @Override
                         public void run() {
@@ -148,8 +148,30 @@ public class ThreadedDatabase {
             this.context = context;
         }
 
-        protected void doInBackground(Database db, java.lang.Runnable runnable) throws CouchbaseLiteException {
-            db.inBatch(runnable);
+        protected void doInBackground(Database db, List<BatchAction> ActionList) throws CouchbaseLiteException {
+            final Database localdb = db;
+            final List<BatchAction> locallist = ActionList;
+            db.inBatch(new Runnable() {
+                @Override
+                public void run() {
+                    for (int i = 0; i < locallist.size(); i++) {
+                        BatchAction action = locallist.get(i);
+                        if (action.getType() == BatchAction.BatchActionType.CREATE || action.getType() == BatchAction.BatchActionType.UPDATE) {
+                            try {
+                                localdb.save(action.getDocument());
+                            } catch (CouchbaseLiteException e) {
+                                e.printStackTrace();
+                            }
+                        } else if (action.getType() == BatchAction.BatchActionType.DELETE) {
+                            try {
+                                localdb.delete(action.getDocument());
+                            } catch (CouchbaseLiteException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }
+            });
         }
 
         protected void onPostExecute() {

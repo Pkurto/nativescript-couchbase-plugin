@@ -1,4 +1,5 @@
 import {
+    BatchAction, BatchActionType,
     Common,
     Query,
     QueryComparisonOperator,
@@ -38,12 +39,20 @@ export class Couchbase extends Common {
         return Promise.resolve();
     }
 
-    inBatch(batch: Promise<any>[]): Promise<any> {
+    inBatch(batchActions: BatchAction[]): Promise<any> {
         return new Promise<any>((resolve, reject) => {
             const errorRef = new interop.Reference();
             this.ios.inBatchUsingBlock(errorRef, () => {
-                return Promise.all(batch).then(() => {
-                    console.log('batch is done');
+                batchActions.forEach(batchAction => {
+                    if (batchAction === null) {
+                        return;
+                    }
+
+                    if (batchAction.type === BatchActionType.CREATE || batchAction.type === BatchActionType.UPDATE) {
+                        this.ios.saveDocumentError(batchAction.ios);
+                    } else if (batchAction.type === BatchActionType.DELETE) {
+                        this.ios.deleteDocumentError(batchAction.ios);
+                    }
                 });
             });
 
@@ -67,6 +76,27 @@ export class Couchbase extends Common {
             }
             this.ios.saveDocumentError(doc);
             resolve(doc.id);
+        });
+    }
+
+    createDocumentBatchAction(data: Object, documentId?: string): Promise<BatchAction> {
+        return new Promise<BatchAction>((resolve, reject) => {
+            let doc;
+            if (documentId) {
+                doc = CBLMutableDocument.alloc().initWithID(documentId);
+            } else {
+                doc = CBLMutableDocument.alloc().init();
+            }
+
+            const keys = Object.keys(data);
+            for (let key of keys) {
+                const item = data[key];
+                this.serialize(item, doc, key);
+            }
+            const action = new BatchAction();
+            action.type = BatchActionType.CREATE;
+            action.ios = doc;
+            resolve(action);
         });
     }
 
@@ -309,11 +339,85 @@ export class Couchbase extends Common {
         });
     }
 
+    updateDocumentBatchAction(documentId: string, data: any): Promise<BatchAction> {
+        return new Promise<BatchAction>((resolve, reject) => {
+            const original = this.ios.documentWithID(documentId);
+            const newDoc = original.toMutable();
+            const keys = Object.keys(data);
+            for (let key of keys) {
+                const item = data[key];
+                newDoc.setValueForKey(item, key);
+            }
+            const action = new BatchAction();
+            action.type = BatchActionType.UPDATE;
+            action.ios = newDoc;
+            resolve(action);
+        });
+    }
+
+    upsertDocument(documentId: string, data: any): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            let doc;
+            const original = this.ios.documentWithID(documentId);
+            if (original) {
+                doc = original.toMutable();
+            } else {
+                doc = CBLMutableDocument.alloc().initWithID(documentId);
+            }
+            const keys = Object.keys(data);
+            for (let key of keys) {
+                const item = data[key];
+                doc.setValueForKey(item, key);
+            }
+            this.ios.saveDocumentError(doc);
+            resolve();
+        });
+    }
+
+    upsertDocumentBatchAction(documentId: string, data: any): Promise<BatchAction> {
+        return new Promise<BatchAction>((resolve, reject) => {
+            const original = this.ios.documentWithID(documentId);
+            if (original) {
+                const newDoc = original.toMutable();
+                const keys = Object.keys(data);
+                for (let key of keys) {
+                    const item = data[key];
+                    newDoc.setValueForKey(item, key);
+                }
+                const action = new BatchAction();
+                action.type = BatchActionType.UPDATE;
+                action.ios = newDoc;
+                resolve(action);
+            } else {
+                const newDoc = CBLMutableDocument.alloc().initWithID(documentId);
+                const keys = Object.keys(data);
+                for (let key of keys) {
+                    const item = data[key];
+                    newDoc.setValueForKey(item, key);
+                }
+                const action = new BatchAction();
+                action.type = BatchActionType.CREATE;
+                action.ios = newDoc;
+                resolve(action);
+            }
+        });
+    }
+
     deleteDocument(documentId: string): Promise<any> {
         return new Promise<any>((resolve, reject) => {
             const doc = this.ios.documentWithID(documentId);
             this.ios.deleteDocumentError(doc);
             resolve();
+        });
+    }
+
+    deleteDocumentBatchAction(documentId: string): Promise<BatchAction> {
+        return new Promise<BatchAction>((resolve, reject) => {
+            const doc = this.ios.documentWithID(documentId);
+            const action = new BatchAction();
+            action.type = BatchActionType.DELETE;
+            action.ios = doc;
+            resolve(action);
         });
     }
 

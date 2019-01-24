@@ -4039,13 +4039,38 @@ declare module org {
 declare module org {
 	export module nativescript {
 		export module couchbaseplugin {
+			export class BatchAction {
+				public static class: java.lang.Class<org.nativescript.couchbaseplugin.BatchAction>;
+				public getType(): org.nativescript.couchbaseplugin.BatchAction.BatchActionType;
+				public setType(param0: org.nativescript.couchbaseplugin.BatchAction.BatchActionType): void;
+				public getDocument(): com.couchbase.lite.MutableDocument;
+				public setDocument(param0: com.couchbase.lite.MutableDocument): void;
+				public constructor();
+			}
+			export module BatchAction {
+				export class BatchActionType {
+					public static class: java.lang.Class<org.nativescript.couchbaseplugin.BatchAction.BatchActionType>;
+					public static CREATE: org.nativescript.couchbaseplugin.BatchAction.BatchActionType;
+					public static UPDATE: org.nativescript.couchbaseplugin.BatchAction.BatchActionType;
+					public static DELETE: org.nativescript.couchbaseplugin.BatchAction.BatchActionType;
+					public static values(): native.Array<org.nativescript.couchbaseplugin.BatchAction.BatchActionType>;
+					public static valueOf(param0: string): org.nativescript.couchbaseplugin.BatchAction.BatchActionType;
+				}
+			}
+		}
+	}
+}
+
+declare module org {
+	export module nativescript {
+		export module couchbaseplugin {
 			export class ThreadedDatabase {
 				public static class: java.lang.Class<org.nativescript.couchbaseplugin.ThreadedDatabase>;
 				public db: com.couchbase.lite.Database;
 				public addChangeListener(param0: com.couchbase.lite.DatabaseChangeListener, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public delete(param0: com.couchbase.lite.Document, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public executeQuery(param0: com.couchbase.lite.Select, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
-				public inBatch(param0: java.lang.Runnable, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
+				public inBatch(param0: java.util.List<org.nativescript.couchbaseplugin.BatchAction>, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public getDocument(param0: string, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public save(param0: com.couchbase.lite.MutableDocument, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public static Open(param0: string, param1: com.couchbase.lite.DatabaseConfiguration, param2: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param3: any): void;

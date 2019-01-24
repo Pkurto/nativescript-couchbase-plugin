@@ -1,4 +1,5 @@
 import {
+    BatchAction, BatchActionType,
     Common,
     Query,
     QueryComparisonOperator,
@@ -88,23 +89,32 @@ export class Couchbase extends Common {
         });
     }
 
-    inBatch(batch: Promise<any>[]): Promise<any> {
+    inBatch(batchActions: BatchAction[]): Promise<any> {
         return new Promise((resolve, reject) => {
+            const javaList = new java.util.ArrayList();
+            batchActions.forEach(batchAction => {
+                if (batchAction === null) {
+                    return;
+                }
+                const javaBatchAction = new org.nativescript.couchbaseplugin.BatchAction();
+                javaBatchAction.setDocument(batchAction.android);
+                if (batchAction.type === BatchActionType.CREATE) {
+                    javaBatchAction.setType(org.nativescript.couchbaseplugin.BatchAction.BatchActionType.CREATE);
+                } else if (batchAction.type === BatchActionType.UPDATE) {
+                    javaBatchAction.setType(org.nativescript.couchbaseplugin.BatchAction.BatchActionType.UPDATE);
+                } else if (batchAction.type === BatchActionType.DELETE) {
+                    javaBatchAction.setType(org.nativescript.couchbaseplugin.BatchAction.BatchActionType.DELETE);
+                }
+                javaList.add(javaBatchAction);
+            });
+
             pendingRequests[requestIdCounter] = {
                 resolveCallback: resolve,
                 rejectCallback: reject
             };
 
-            const runnable = new java.lang.Runnable({
-                run: () => {
-                    return Promise.all(batch).then(() => {
-                        console.log('batch is done');
-                    });
-                }
-            });
-
             ensureCompleteCallback();
-            this.android.inBatch(runnable, completeCallback, new java.lang.Integer(requestIdCounter));
+            this.android.inBatch(javaList, completeCallback, new java.lang.Integer(requestIdCounter));
 
             // increment the id counter
             requestIdCounter++;
@@ -137,6 +147,31 @@ export class Couchbase extends Common {
 
                 // increment the id counter
                 requestIdCounter++;
+            } catch (e) {
+                reject(e);
+            }
+        });
+    }
+
+    createDocumentBatchAction(data: Object, documentId?: string): Promise<BatchAction> {
+        return new Promise<BatchAction>((resolve, reject) => {
+            try {
+                let doc;
+                if (documentId) {
+                    doc = new com.couchbase.lite.MutableDocument(documentId);
+                } else {
+                    doc = new com.couchbase.lite.MutableDocument();
+                }
+                const keys = Object.keys(data);
+                for (let key of keys) {
+                    const item = data[key];
+                    this.serialize(item, doc, key);
+                }
+
+                const action = new BatchAction();
+                action.type = BatchActionType.CREATE;
+                action.android = doc;
+                resolve(action);
             } catch (e) {
                 reject(e);
             }
@@ -263,6 +298,123 @@ export class Couchbase extends Common {
                         requestIdCounter++;
                     } else {
                         resolve();
+                    }
+                }),
+                rejectCallback: (e) => {
+                    reject(e);
+                }
+            };
+
+            ensureCompleteCallback();
+            this.android.getDocument(documentId, completeCallback, new java.lang.Integer(requestIdCounter));
+
+            // increment the id counter
+            requestIdCounter++;
+        });
+    }
+
+    updateDocumentBatchAction(documentId: string, data: any): Promise<BatchAction> {
+        return new Promise<BatchAction>((resolve, reject) => {
+            pendingRequests[requestIdCounter] = {
+                resolveCallback: ((origin) => {
+                    if (origin) {
+                        const doc = origin.toMutable();
+                        const keys = Object.keys(data);
+                        for (let key of keys) {
+                            const item = data[key];
+                            this.serialize(item, doc, key);
+                        }
+
+                        const action = new BatchAction();
+                        action.type = BatchActionType.UPDATE;
+                        action.android = doc;
+                        resolve(action);
+                    } else {
+                        resolve(null);
+                    }
+                }),
+                rejectCallback: (e) => {
+                    reject(e);
+                }
+            };
+
+            ensureCompleteCallback();
+            this.android.getDocument(documentId, completeCallback, new java.lang.Integer(requestIdCounter));
+
+            // increment the id counter
+            requestIdCounter++;
+        });
+    }
+
+    upsertDocument(documentId: string, data: any): Promise<any> {
+        return new Promise((resolve, reject) => {
+            pendingRequests[requestIdCounter] = {
+                resolveCallback: ((origin) => {
+                    let doc;
+                    if (origin) {
+                        doc = origin.toMutable();
+                    } else {
+                        doc = new com.couchbase.lite.MutableDocument(documentId);
+                    }
+
+                    const keys = Object.keys(data);
+                    for (let key of keys) {
+                        const item = data[key];
+                        this.serialize(item, doc, key);
+                    }
+
+                    pendingRequests[requestIdCounter] = {
+                        resolveCallback: resolve,
+                        rejectCallback: reject
+                    };
+
+                    ensureCompleteCallback();
+                    this.android.save(doc, completeCallback, new java.lang.Integer(requestIdCounter));
+
+                    // increment the id counter
+                    requestIdCounter++;
+                }),
+                rejectCallback: (e) => {
+                    reject(e);
+                }
+            };
+
+            ensureCompleteCallback();
+            this.android.getDocument(documentId, completeCallback, new java.lang.Integer(requestIdCounter));
+
+            // increment the id counter
+            requestIdCounter++;
+        });
+    }
+
+    upsertDocumentBatchAction(documentId: string, data: any): Promise<BatchAction> {
+        return new Promise<BatchAction>((resolve, reject) => {
+            pendingRequests[requestIdCounter] = {
+                resolveCallback: ((origin) => {
+                    if (origin) {
+                        const doc = origin.toMutable();
+                        const keys = Object.keys(data);
+                        for (let key of keys) {
+                            const item = data[key];
+                            this.serialize(item, doc, key);
+                        }
+
+                        const action = new BatchAction();
+                        action.type = BatchActionType.UPDATE;
+                        action.android = doc;
+                        resolve(action);
+                    } else {
+                        const doc = new com.couchbase.lite.MutableDocument(documentId);
+                        const keys = Object.keys(data);
+                        for (let key of keys) {
+                            const item = data[key];
+                            this.serialize(item, doc, key);
+                        }
+
+                        const action = new BatchAction();
+                        action.type = BatchActionType.CREATE;
+                        action.android = doc;
+                        resolve(action);
                     }
                 }),
                 rejectCallback: (e) => {
@@ -456,6 +608,30 @@ export class Couchbase extends Common {
                         requestIdCounter++;
                     } else {
                         resolve();
+                    }
+                }),
+                rejectCallback: reject
+            };
+
+            ensureCompleteCallback();
+            this.android.getDocument(documentId, completeCallback, new java.lang.Integer(requestIdCounter));
+
+            // increment the id counter
+            requestIdCounter++;
+        });
+    }
+
+    deleteDocumentBatchAction(documentId: string): Promise<BatchAction> {
+        return new Promise<BatchAction>((resolve, reject) => {
+            pendingRequests[requestIdCounter] = {
+                resolveCallback: ((doc) => {
+                    if (doc) {
+                        const action = new BatchAction();
+                        action.type = BatchActionType.UPDATE;
+                        action.android = doc;
+                        resolve(action);
+                    } else {
+                        resolve(null);
                     }
                 }),
                 rejectCallback: reject

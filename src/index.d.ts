@@ -1,4 +1,4 @@
-import { Common, Query, ReplicatorBase } from './couchbase-plugin.common';
+import {BatchAction, Common, Query, ReplicatorBase} from './couchbase-plugin.common';
 
 export {
     Query, QueryMeta, QueryArrayOperator, QueryComparisonOperator, QueryLogicalOperator, QueryOrderItem, QueryWhereItem
@@ -15,11 +15,21 @@ export declare class Couchbase extends Common {
 
     createDocument(data: Object, documentId?: string): Promise<any>;
 
+    createDocumentBatchAction(data: Object, documentId?: string): Promise<BatchAction>;
+
     getDocument(documentId: string): Promise<any>;
 
     updateDocument(documentId: string, data: any): Promise<any>;
 
+    updateDocumentBatchAction(documentId: string, data: any): Promise<BatchAction>;
+
+    upsertDocument(documentId: string, data: any): Promise<any>;
+
+    upsertDocumentBatchAction(documentId: string, data: any): Promise<BatchAction>;
+
     deleteDocument(documentId: string): Promise<any>;
+
+    deleteDocumentBatchAction(documentId: string): Promise<BatchAction>;
 
     destroyDatabase(): Promise<any>;
 
@@ -31,7 +41,7 @@ export declare class Couchbase extends Common {
 
     addDatabaseChangeListener(callback: any): Promise<any>;
 
-    inBatch(batch: Promise<any>[]): Promise<any>;
+    inBatch(batch: BatchAction[]): Promise<any>;
 }
 
 export declare class Replicator extends ReplicatorBase {
