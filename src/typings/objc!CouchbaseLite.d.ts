@@ -55,7 +55,7 @@ declare class CBLArray extends NSObject implements CBLArrayProtocol, NSCopying, 
 
 	numberAtIndex(index: number): number;
 
-	objectAtIndexedSubscript(index: number): CBLFragment;
+	objectAtIndexedSubscript(index: number): any;
 
 	performSelector(aSelector: string): any;
 
@@ -80,7 +80,7 @@ declare class CBLArray extends NSObject implements CBLArrayProtocol, NSCopying, 
 
 interface CBLArrayFragment extends NSObjectProtocol {
 
-	objectAtIndexedSubscript(index: number): CBLFragment;
+	objectAtIndexedSubscript(index: number): any;
 }
 declare var CBLArrayFragment: {
 
@@ -240,7 +240,7 @@ declare class CBLDatabase extends NSObject {
 
 	initWithNameError(name: string): this;
 
-	objectForKeyedSubscript(documentID: string): CBLDocumentFragment;
+	objectForKeyedSubscript(documentID: string): any;
 
 	purgeDocumentError(document: CBLDocument): boolean;
 
@@ -334,7 +334,7 @@ declare class CBLDictionary extends NSObject implements CBLDictionaryProtocol, N
 
 	numberForKey(key: string): number;
 
-	objectForKeyedSubscript(key: string): CBLFragment;
+	objectForKeyedSubscript(key: string): any;
 
 	performSelector(aSelector: string): any;
 
@@ -359,7 +359,7 @@ declare class CBLDictionary extends NSObject implements CBLDictionaryProtocol, N
 
 interface CBLDictionaryFragment extends NSObjectProtocol {
 
-	objectForKeyedSubscript(key: string): CBLFragment;
+	objectForKeyedSubscript(key: string): any;
 }
 declare var CBLDictionaryFragment: {
 
@@ -466,7 +466,7 @@ declare class CBLDocument extends NSObject implements CBLDictionaryProtocol, NSM
 
 	numberForKey(key: string): number;
 
-	objectForKeyedSubscript(key: string): CBLFragment;
+	objectForKeyedSubscript(key: string): any;
 
 	performSelector(aSelector: string): any;
 
@@ -532,7 +532,7 @@ declare class CBLDocumentFragment extends NSObject implements CBLDictionaryFragm
 
 	isMemberOfClass(aClass: typeof NSObject): boolean;
 
-	objectForKeyedSubscript(key: string): CBLFragment;
+	objectForKeyedSubscript(key: string): any;
 
 	performSelector(aSelector: string): any;
 
@@ -739,9 +739,9 @@ declare class CBLFragment extends NSObject implements CBLArrayFragment, CBLDicti
 
 	isMemberOfClass(aClass: typeof NSObject): boolean;
 
-	objectAtIndexedSubscript(index: number): CBLFragment;
+	objectAtIndexedSubscript(index: number): any;
 
-	objectForKeyedSubscript(key: string): CBLFragment;
+	objectForKeyedSubscript(key: string): any;
 
 	performSelector(aSelector: string): any;
 
@@ -983,7 +983,7 @@ declare class CBLMutableArray extends CBLArray implements CBLMutableArrayProtoco
 
 	numberAtIndex(index: number): number;
 
-	objectAtIndexedSubscript(index: number): CBLFragment;
+	objectAtIndexedSubscript(index: number): any;
 
 	performSelector(aSelector: string): any;
 
@@ -1034,7 +1034,7 @@ declare class CBLMutableArray extends CBLArray implements CBLMutableArrayProtoco
 
 interface CBLMutableArrayFragment extends CBLArrayFragment {
 
-	objectAtIndexedSubscript(index: number): CBLMutableFragment;
+	objectAtIndexedSubscript(index: number): any;
 }
 declare var CBLMutableArrayFragment: {
 
@@ -1189,7 +1189,7 @@ declare class CBLMutableDictionary extends CBLDictionary implements CBLMutableDi
 
 	numberForKey(key: string): number;
 
-	objectForKeyedSubscript(key: string): CBLFragment;
+	objectForKeyedSubscript(key: string): any;
 
 	performSelector(aSelector: string): any;
 
@@ -1240,7 +1240,7 @@ declare class CBLMutableDictionary extends CBLDictionary implements CBLMutableDi
 
 interface CBLMutableDictionaryFragment extends CBLDictionaryFragment {
 
-	objectForKeyedSubscript(key: string): CBLMutableFragment;
+	objectForKeyedSubscript(key: string): any;
 }
 declare var CBLMutableDictionaryFragment: {
 
@@ -1357,7 +1357,7 @@ declare class CBLMutableDocument extends CBLDocument implements CBLMutableDictio
 
 	numberForKey(key: string): number;
 
-	objectForKeyedSubscript(key: string): CBLFragment;
+	objectForKeyedSubscript(key: string): any;
 
 	performSelector(aSelector: string): any;
 
@@ -1461,9 +1461,9 @@ declare class CBLMutableFragment extends CBLFragment implements CBLMutableArrayF
 
 	isMemberOfClass(aClass: typeof NSObject): boolean;
 
-	objectAtIndexedSubscript(index: number): CBLMutableFragment;
+	objectAtIndexedSubscript(index: number): any;
 
-	objectForKeyedSubscript(key: string): CBLMutableFragment;
+	objectForKeyedSubscript(key: string): any;
 
 	performSelector(aSelector: string): any;
 
@@ -1985,9 +1985,9 @@ declare class CBLQueryResult extends NSObject implements CBLArrayProtocol, CBLDi
 
 	numberForKey(key: string): number;
 
-	objectAtIndexedSubscript(index: number): CBLFragment;
+	objectAtIndexedSubscript(index: number): any;
 
-	objectForKeyedSubscript(key: string): CBLFragment;
+	objectForKeyedSubscript(key: string): any;
 
 	performSelector(aSelector: string): any;
 
@@ -2016,9 +2016,9 @@ declare class CBLQueryResult extends NSObject implements CBLArrayProtocol, CBLDi
 
 declare class CBLQueryResultSet extends NSEnumerator<CBLQueryResult> {
 
-	static alloc(): CBLQueryResultSet; // inherited from NSObject
+	static alloc(): any; // inherited from NSObject
 
-	static new(): CBLQueryResultSet; // inherited from NSObject
+	static new(): any; // inherited from NSObject
 
 	allResults(): NSArray<CBLQueryResult>;
 }

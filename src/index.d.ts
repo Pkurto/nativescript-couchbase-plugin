@@ -1,4 +1,4 @@
-import {BatchAction, Common, Query, ReplicatorBase} from './couchbase-plugin.common';
+import {BatchAction, Common, LogDomain, LogLevel, Query, ReplicatorBase} from './couchbase-plugin.common';
 
 export {
     Query, QueryMeta, QueryArrayOperator, QueryComparisonOperator, QueryLogicalOperator, QueryOrderItem, QueryWhereItem
@@ -8,6 +8,8 @@ export declare class Couchbase extends Common {
     config: any;
     android: any;
     ios: any;
+
+    public static setLogLevel(domain: LogDomain, level: LogLevel): void;
 
     constructor(name: string);
 

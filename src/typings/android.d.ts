@@ -2405,6 +2405,22 @@ declare module com {
 	}
 }
 
+declare module okhttp3 {
+  export class WebSocket {
+
+  }
+
+  export class Response {
+
+  }
+}
+
+declare module okio {
+  export class ByteString {
+
+  }
+}
+
 declare module com {
 	export module couchbase {
 		export module lite {
@@ -2488,21 +2504,6 @@ declare module com {
 				export module support {
 					export class Logger {
 						public static class: java.lang.Class<com.couchbase.lite.internal.support.Logger>;
-					}
-				}
-			}
-		}
-	}
-}
-
-declare module com {
-	export module couchbase {
-		export module lite {
-			export module internal {
-				export module utils {
-					export class ClassUtils {
-						public static class: java.lang.Class<com.couchbase.lite.internal.utils.ClassUtils>;
-						public static cast(param0: any, param1: java.lang.Class): any;
 					}
 				}
 			}
@@ -3415,7 +3416,7 @@ declare module com {
 				public static kC4NoFraming: number;
 				public static kC4WebSocketServerFraming: number;
 				public static reverseLookupTable: java.util.Map<java.lang.Long,com.couchbase.litecore.C4Socket>;
-				public static socketFactory: java.util.Map<java.lang.Integer,java.lang.Class>;
+				public static socketFactory: java.util.Map<java.lang.Integer,java.lang.Object>;
 				public static socketFactoryContext: java.util.Map<java.lang.Integer,com.couchbase.lite.Replicator>;
 				public handle: number;
 				public nativeHandle: any;
@@ -3570,14 +3571,14 @@ declare module com {
 					public endArray(): boolean;
 					public writeValue(param0: com.couchbase.litecore.fleece.FLValue): boolean;
 					public release(): void;
-					public write(param0: java.util.List): boolean;
+					public write(param0: java.util.List<java.lang.Object>): boolean;
 					public beginDict(param0: number): boolean;
 					public beginArray(param0: number): boolean;
 					public writeValue(param0: com.couchbase.litecore.fleece.FLArray): boolean;
 					public constructor();
 					public finish(): com.couchbase.litecore.fleece.AllocSlice;
 					public getFLEncoder(): com.couchbase.litecore.fleece.FLEncoder;
-					public write(param0: java.util.Map): boolean;
+					public write(param0: java.util.Map<java.lang.Object, java.lang.Object>): boolean;
 					public writeValue(param0: com.couchbase.litecore.fleece.FLDict): boolean;
 				}
 			}
@@ -3749,11 +3750,11 @@ declare module com {
 					public constructor(param0: number, param1: boolean);
 					public setExtraInfo(param0: any): void;
 					public getExtraInfo(): any;
-					public write(param0: java.util.List): boolean;
+					public write(param0: java.util.List<java.lang.Object>): boolean;
 					public beginDict(param0: number): boolean;
 					public beginArray(param0: number): boolean;
 					public constructor();
-					public write(param0: java.util.Map): boolean;
+					public write(param0: java.util.Map<java.lang.Object, java.lang.Object>): boolean;
 					public constructor(param0: number);
 				}
 			}
@@ -3903,7 +3904,17 @@ declare module com {
 		export module litecore {
 			export module fleece {
 				export class MDict extends com.couchbase.litecore.fleece.MCollection implements java.lang.Iterable<string>  {
-					public static class: java.lang.Class<com.couchbase.litecore.fleece.MDict>;
+          public static class: java.lang.Class<com.couchbase.litecore.fleece.MDict>;
+          public wait(): void;
+          public equals(param0: any): boolean;
+          public clone(): any;
+          public toString(): string;
+          public notify(): void;
+          public getClass(): java.lang.Class<any>;
+          public wait(param0: number, param1: number): void;
+          public finalize(): void;
+          public hashCode(): number;
+          public notifyAll(): void;
 					public get(param0: string): com.couchbase.litecore.fleece.MValue;
 					public initAsCopyOf(param0: com.couchbase.litecore.fleece.MDict, param1: boolean): void;
 					public set(param0: string, param1: com.couchbase.litecore.fleece.MValue): boolean;
@@ -4044,7 +4055,8 @@ declare module org {
 				public getType(): org.nativescript.couchbaseplugin.BatchAction.BatchActionType;
 				public setType(param0: org.nativescript.couchbaseplugin.BatchAction.BatchActionType): void;
 				public getDocument(): com.couchbase.lite.MutableDocument;
-				public setDocument(param0: com.couchbase.lite.MutableDocument): void;
+				public setDocument(param0: com.couchbase.lite.Document): void;
+        public setMutableDocument(param0: com.couchbase.lite.MutableDocument): void;
 				public constructor();
 			}
 			export module BatchAction {
@@ -4067,7 +4079,7 @@ declare module org {
 			export class ThreadedDatabase {
 				public static class: java.lang.Class<org.nativescript.couchbaseplugin.ThreadedDatabase>;
 				public db: com.couchbase.lite.Database;
-				public addChangeListener(param0: com.couchbase.lite.DatabaseChangeListener, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
+				public addChangeListener(param0: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param1: any, param2: any): void;
 				public delete(param0: com.couchbase.lite.Document, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public executeQuery(param0: com.couchbase.lite.Select, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;
 				public inBatch(param0: java.util.List<org.nativescript.couchbaseplugin.BatchAction>, param1: org.nativescript.couchbaseplugin.Threaded.CompleteCallback, param2: any): void;

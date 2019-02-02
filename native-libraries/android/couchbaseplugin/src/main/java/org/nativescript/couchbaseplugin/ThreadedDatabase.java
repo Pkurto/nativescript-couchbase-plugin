@@ -4,6 +4,7 @@ import android.util.Log;
 
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
+import com.couchbase.lite.DatabaseChange;
 import com.couchbase.lite.DatabaseChangeListener;
 import com.couchbase.lite.DatabaseConfiguration;
 import com.couchbase.lite.Document;
@@ -158,7 +159,7 @@ public class ThreadedDatabase {
                         BatchAction action = locallist.get(i);
                         if (action.getType() == BatchAction.BatchActionType.CREATE || action.getType() == BatchAction.BatchActionType.UPDATE) {
                             try {
-                                localdb.save(action.getDocument());
+                                localdb.save(action.getMutableDocument());
                             } catch (CouchbaseLiteException e) {
                                 e.printStackTrace();
                             }
@@ -432,9 +433,15 @@ public class ThreadedDatabase {
         }
     }
 
-    public void addChangeListener(final DatabaseChangeListener listener, final Threaded.CompleteCallback callback, final Object context) {
+    public void addChangeListener(final Threaded.CompleteCallback callback, final Object context, final Object callBackID) {
         final android.os.Handler mHandler = new android.os.Handler();
         final Database db = this.db;
+        final DatabaseChangeListener listener = new DatabaseChangeListener() {
+            @Override
+            public void changed(DatabaseChange change) {
+                callback.onComplete(change, callBackID);
+            }
+        };
         Threaded.threadPoolExecutor().execute(new Runnable() {
             @Override
             public void run() {

@@ -1,763 +1,805 @@
 import {
-    BatchAction, BatchActionType,
-    Common,
-    Query,
-    QueryComparisonOperator,
-    QueryLogicalOperator,
-    QueryMeta,
-    ReplicatorBase
+  BatchAction, BatchActionType,
+  Common, LogDomain, LogLevel,
+  Query,
+  QueryComparisonOperator,
+  QueryLogicalOperator,
+  QueryMeta,
+  ReplicatorBase
 } from './couchbase-plugin.common';
 import * as types from 'tns-core-modules/utils/types';
-import * as sp from 'synchronized-promise';
 
 export {
-    Query, QueryMeta, QueryArrayOperator, QueryComparisonOperator, QueryLogicalOperator, QueryOrderItem, QueryWhereItem
+  Query, QueryMeta, QueryArrayOperator, QueryComparisonOperator, QueryLogicalOperator, QueryOrderItem, QueryWhereItem
 }from './couchbase-plugin.common';
 
 declare var CBLDatabase,
-    CBLMutableDocument,
-    CBLURLEndpoint,
-    CBLReplicatorConfiguration,
-    CBLReplicatorType,
-    CBLBasicAuthenticator,
-    CBLReplicator,
-    CBLQueryExpression,
-    CBLQueryOrdering,
-    CBLQueryBuilder,
-    CBLReplicatorActivityLevel,
-    CBLQueryDataSource,
-    CBLQuerySelectResult,
-    CBLQueryMeta;
+  CBLMutableDocument,
+  CBLURLEndpoint,
+  CBLReplicatorConfiguration,
+  CBLReplicatorType,
+  CBLBasicAuthenticator,
+  CBLReplicator,
+  CBLQueryExpression,
+  CBLQueryOrdering,
+  CBLQueryBuilder,
+  CBLReplicatorActivityLevel,
+  CBLQueryDataSource,
+  CBLQuerySelectResult,
+  CBLQueryMeta;
 
 export class Couchbase extends Common {
-    constructor(databaseName: string) {
-        super(databaseName);
-        this.ios = CBLDatabase.alloc().initWithNameError(databaseName);
+  public static setLogLevel(domain: LogDomain, level: LogLevel) {
+    let iosDomain = CBLLogDomain.kCBLLogDomainAll;
+    let iosLevel = CBLLogLevel.kCBLLogLevelDebug;
+
+    if (domain === LogDomain.DATABASE) {
+      iosDomain = CBLLogDomain.kCBLLogDomainDatabase;
+    } else if (domain === LogDomain.QUERY) {
+      iosDomain = CBLLogDomain.kCBLLogDomainQuery;
+    } else if (domain === LogDomain.REPLICATOR) {
+      iosDomain = CBLLogDomain.kCBLLogDomainReplicator;
+    } else if (domain === LogDomain.NETWORK) {
+      iosDomain = CBLLogDomain.kCBLLogDomainNetwork;
     }
 
-    open(): Promise<any> {
-        return Promise.resolve();
+    if (level === LogLevel.VERBOSE) {
+      iosLevel = CBLLogLevel.kCBLLogLevelVerbose;
+    } else if (level === LogLevel.INFO) {
+      iosLevel = CBLLogLevel.kCBLLogLevelInfo;
+    } else if (level === LogLevel.WARNING) {
+      iosLevel = CBLLogLevel.kCBLLogLevelWarning;
+    } else if (level === LogLevel.ERROR) {
+      iosLevel = CBLLogLevel.kCBLLogLevelError;
+    } else if (level === LogLevel.NONE) {
+      iosLevel = CBLLogLevel.kCBLLogLevelNone;
     }
 
-    inBatch(batchActions: BatchAction[]): Promise<any> {
-        return new Promise<any>((resolve, reject) => {
-            const errorRef = new interop.Reference();
-            this.ios.inBatchUsingBlock(errorRef, () => {
-                batchActions.forEach(batchAction => {
-                    if (batchAction === null) {
-                        return;
-                    }
+    CBLDatabase.setLogLevelDomain(iosLevel, iosDomain);
+  }
 
-                    if (batchAction.type === BatchActionType.CREATE || batchAction.type === BatchActionType.UPDATE) {
-                        this.ios.saveDocumentError(batchAction.ios);
-                    } else if (batchAction.type === BatchActionType.DELETE) {
-                        this.ios.deleteDocumentError(batchAction.ios);
-                    }
-                });
-            });
+  constructor(databaseName: string) {
+    super(databaseName);
+    this.ios = CBLDatabase.alloc().initWithNameError(databaseName);
+  }
 
-            resolve();
-        });
-    }
+  open(): Promise<any> {
+    return Promise.resolve();
+  }
 
-    createDocument(data: Object, documentId?: string): Promise<any> {
-        return new Promise<any>((resolve, reject) => {
-            let doc;
-            if (documentId) {
-                doc = CBLMutableDocument.alloc().initWithID(documentId);
-            } else {
-                doc = CBLMutableDocument.alloc().init();
-            }
-
-            const keys = Object.keys(data);
-            for (let key of keys) {
-                const item = data[key];
-                this.serialize(item, doc, key);
-            }
-            this.ios.saveDocumentError(doc);
-            resolve(doc.id);
-        });
-    }
-
-    createDocumentBatchAction(data: Object, documentId?: string): Promise<BatchAction> {
-        return new Promise<BatchAction>((resolve, reject) => {
-            let doc;
-            if (documentId) {
-                doc = CBLMutableDocument.alloc().initWithID(documentId);
-            } else {
-                doc = CBLMutableDocument.alloc().init();
-            }
-
-            const keys = Object.keys(data);
-            for (let key of keys) {
-                const item = data[key];
-                this.serialize(item, doc, key);
-            }
-            const action = new BatchAction();
-            action.type = BatchActionType.CREATE;
-            action.ios = doc;
-            resolve(action);
-        });
-    }
-
-    private fromISO8601UTC(date: string) {
-        const dateFormatter = NSDateFormatter.new();
-        dateFormatter.dateFormat = 'yyyy-MM-dd\'T\'HH:mm:ss.SSSZ';
-        return dateFormatter.dateFromString(date);
-    }
-
-    private serializeObject(item, object: any, key) {
-        if (item === null) {
+  inBatch(batchActions: BatchAction[]): Promise<any> {
+    return new Promise<any>((resolve, reject) => {
+      const errorRef = new interop.Reference();
+      this.ios.inBatchUsingBlock(errorRef, () => {
+        batchActions.forEach(batchAction => {
+          if (batchAction === null) {
             return;
-        }
+          }
 
-        switch (typeof item) {
-            case 'object':
-                if (item instanceof Date) {
-                    object.setDateForKey(this.fromISO8601UTC(item.toISOString()), key);
-                    return;
-                }
-
-                if (Array.isArray(item)) {
-                    const array = CBLMutableArray.new();
-                    item.forEach((data) => {
-                        this.serializeArray(data, array);
-                    });
-                    object.setArrayForKey(array, key);
-                    return;
-                }
-
-                const nativeObject = CBLMutableDictionary.new();
-                Object.keys(item).forEach((itemKey) => {
-                    const obj = item[itemKey];
-                    this.serializeObject(obj, nativeObject, itemKey);
-                });
-                object.setDictionaryForKey(nativeObject, key);
-                break;
-            case 'number':
-                if (this.numberIs64Bit(item)) {
-                    if (this.numberHasDecimals(item)) {
-                        object.setDoubleForKey(item, key);
-                    } else {
-                        object.setLongLongForKey(item, key);
-                    }
-                } else {
-                    if (this.numberHasDecimals(item)) {
-                        object.setFloatForKey(item, key);
-                    } else {
-                        object.setIntegerForKey(item, key);
-                    }
-                }
-                break;
-            case 'boolean':
-                object.setBooleanForKey(item, key);
-                break;
-            default:
-                object.setValueForKey(item, key);
-        }
-    }
-
-    private serializeArray(item, array: any) {
-        if (item === null) {
-            return;
-        }
-
-        switch (typeof item) {
-            case 'object':
-                if (item instanceof Date) {
-                    array.addDate(this.fromISO8601UTC(item.toISOString()));
-                    return;
-                }
-
-                if (Array.isArray(item)) {
-                    const nativeArray = CBLMutableArray.new();
-                    item.forEach((data) => {
-                        this.serializeArray(data, nativeArray);
-                    });
-                    array.addArray(nativeArray);
-                    return;
-                }
-
-                const object = CBLMutableDictionary.new();
-                Object.keys(item).forEach((itemKey) => {
-                    const obj = item[itemKey];
-                    this.serializeObject(obj, object, itemKey);
-                });
-                array.addDictionary(object);
-                break;
-            case 'number':
-                if (this.numberIs64Bit(item)) {
-                    if (this.numberHasDecimals(item)) {
-                        array.addDouble(item);
-                    } else {
-                        array.addLongLong(item);
-                    }
-                } else {
-                    if (this.numberHasDecimals(item)) {
-                        array.addFloat(item);
-                    } else {
-                        array.addInteger(item);
-                    }
-                }
-                break;
-            case 'boolean':
-                array.addBoolean(item);
-                break;
-            default:
-                array.addValue(item);
-        }
-    }
-
-    private serialize(item, doc: any, key) {
-        if (item === null) {
-            return;
-        }
-
-        switch (typeof item) {
-            case 'object':
-                if (item instanceof Date) {
-                    doc.setDateForKey(this.fromISO8601UTC(item.toISOString()), key);
-                    return;
-                }
-
-                if (Array.isArray(item)) {
-                    const array = CBLMutableArray.new();
-                    item.forEach((data) => {
-                        this.serializeArray(data, array);
-                    });
-                    doc.setArrayForKey(array, key);
-                    return;
-                }
-
-                const object = CBLMutableDictionary.new();
-                Object.keys(item).forEach((itemKey) => {
-                    const obj = item[itemKey];
-                    this.serializeObject(obj, object, itemKey);
-                });
-                doc.setDictionaryForKey(object, key);
-                break;
-            case 'number':
-                if (this.numberIs64Bit(item)) {
-                    if (this.numberHasDecimals(item)) {
-                        doc.setDoubleForKey(item, key);
-                    } else {
-                        doc.setLongLongForKey(item, key);
-                    }
-                } else {
-                    if (this.numberHasDecimals(item)) {
-                        doc.setFloatForKey(item, key);
-                    } else {
-                        doc.setIntegerForKey(item, key);
-                    }
-                }
-                break;
-            case 'boolean':
-                doc.setBooleanForKey(item, key);
-                break;
-            default:
-                doc.setValueForKey(item, key);
-        }
-    }
-
-    getDocument(documentId: string): Promise<any> {
-        return new Promise<any>((resolve, reject) => {
-            const doc = this.ios.documentWithID(documentId);
-            if (doc) {
-                let obj = {};
-                const keys = doc.keys;
-                const size = keys.count;
-                obj['id'] = doc.id;
-                for (let i = 0; i < size; i++) {
-                    const key = keys.objectAtIndex(i);
-                    const value = doc.valueForKey(key);
-                    const newValue = {};
-                    newValue[key] = this.deserialize(value);
-                    obj = Object.assign(obj, newValue);
-                }
-                return resolve(obj);
-            }
-            return resolve(null);
+          if (batchAction.type === BatchActionType.CREATE || batchAction.type === BatchActionType.UPDATE) {
+            this.ios.saveDocumentError(batchAction.ios);
+          } else if (batchAction.type === BatchActionType.DELETE) {
+            this.ios.deleteDocumentError(batchAction.ios);
+          }
         });
+      });
+
+      resolve();
+    });
+  }
+
+  createDocument(data: Object, documentId?: string): Promise<any> {
+    return new Promise<any>((resolve, reject) => {
+      let doc;
+      if (documentId) {
+        doc = CBLMutableDocument.alloc().initWithID(documentId);
+      } else {
+        doc = CBLMutableDocument.alloc().init();
+      }
+
+      const keys = Object.keys(data);
+      for (let key of keys) {
+        const item = data[key];
+        this.serialize(item, doc, key);
+      }
+      this.ios.saveDocumentError(doc);
+      resolve(doc.id);
+    });
+  }
+
+  createDocumentBatchAction(data: Object, documentId?: string): Promise<BatchAction> {
+    return new Promise<BatchAction>((resolve, reject) => {
+      let doc;
+      if (documentId) {
+        doc = CBLMutableDocument.alloc().initWithID(documentId);
+      } else {
+        doc = CBLMutableDocument.alloc().init();
+      }
+
+      const keys = Object.keys(data);
+      for (let key of keys) {
+        const item = data[key];
+        this.serialize(item, doc, key);
+      }
+      const action = new BatchAction();
+      action.type = BatchActionType.CREATE;
+      action.ios = doc;
+      resolve(action);
+    });
+  }
+
+  private fromISO8601UTC(date: string) {
+    const dateFormatter = NSDateFormatter.new();
+    dateFormatter.dateFormat = 'yyyy-MM-dd\'T\'HH:mm:ss.SSSZ';
+    return dateFormatter.dateFromString(date);
+  }
+
+  private serializeObject(item, object: any, key) {
+    if (item === null) {
+      return;
     }
 
-    numberHasDecimals(item: number) {
-        return !(item % 1 === 0);
-    }
-
-    numberIs64Bit(item: number) {
-        return item < -Math.pow(2, 31) + 1 || item > Math.pow(2, 31) - 1;
-    }
-
-    private deserialize(data: any) {
-        if (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean' || typeof data !== 'object') return data;
-
-        if (types.isNullOrUndefined(data)) {
-            return data;
+    switch (typeof item) {
+      case 'object':
+        if (item instanceof Date) {
+          object.setDateForKey(this.fromISO8601UTC(item.toISOString()), key);
+          return;
         }
 
-        if (data instanceof NSNull) {
-            return null;
+        if (Array.isArray(item)) {
+          const array = CBLMutableArray.new();
+          item.forEach((data) => {
+            this.serializeArray(data, array);
+          });
+          object.setArrayForKey(array, key);
+          return;
         }
 
-        if (data instanceof CBLDictionary) {
-            const keys = data.keys;
-            const length = keys.count;
-            const object = {};
-            for (let i = 0; i < length; i++) {
-                const key = keys.objectAtIndex(i);
-                const nativeItem = data.valueForKey(key);
-                object[key] = this.deserialize(nativeItem);
-            }
-            return object;
-        }
-
-        if (data instanceof CBLArray) {
-            const array = [];
-            const size = data.count;
-            for (let i = 0; i < size; i++) {
-                const nativeItem = data.valueAtIndex(i);
-                const item = this.deserialize(nativeItem);
-                array.push(item);
-            }
-            return array;
-        }
-
-        return data;
-    }
-
-    updateDocument(documentId: string, data: any): Promise<any> {
-        return new Promise<any>((resolve, reject) => {
-            const original = this.ios.documentWithID(documentId);
-            const newDoc = original.toMutable();
-            const keys = Object.keys(data);
-            for (let key of keys) {
-                const item = data[key];
-                newDoc.setValueForKey(item, key);
-            }
-            this.ios.saveDocumentError(newDoc);
-            resolve();
+        const nativeObject = CBLMutableDictionary.new();
+        Object.keys(item).forEach((itemKey) => {
+          const obj = item[itemKey];
+          this.serializeObject(obj, nativeObject, itemKey);
         });
-    }
-
-    updateDocumentBatchAction(documentId: string, data: any): Promise<BatchAction> {
-        return new Promise<BatchAction>((resolve, reject) => {
-            const original = this.ios.documentWithID(documentId);
-            const newDoc = original.toMutable();
-            const keys = Object.keys(data);
-            for (let key of keys) {
-                const item = data[key];
-                newDoc.setValueForKey(item, key);
-            }
-            const action = new BatchAction();
-            action.type = BatchActionType.UPDATE;
-            action.ios = newDoc;
-            resolve(action);
-        });
-    }
-
-    upsertDocument(documentId: string, data: any): Promise<any> {
-        return new Promise<any>((resolve, reject) => {
-            let doc;
-            const original = this.ios.documentWithID(documentId);
-            if (original) {
-                doc = original.toMutable();
-            } else {
-                doc = CBLMutableDocument.alloc().initWithID(documentId);
-            }
-            const keys = Object.keys(data);
-            for (let key of keys) {
-                const item = data[key];
-                doc.setValueForKey(item, key);
-            }
-            this.ios.saveDocumentError(doc);
-            resolve();
-        });
-    }
-
-    upsertDocumentBatchAction(documentId: string, data: any): Promise<BatchAction> {
-        return new Promise<BatchAction>((resolve, reject) => {
-            const original = this.ios.documentWithID(documentId);
-            if (original) {
-                const newDoc = original.toMutable();
-                const keys = Object.keys(data);
-                for (let key of keys) {
-                    const item = data[key];
-                    newDoc.setValueForKey(item, key);
-                }
-                const action = new BatchAction();
-                action.type = BatchActionType.UPDATE;
-                action.ios = newDoc;
-                resolve(action);
-            } else {
-                const newDoc = CBLMutableDocument.alloc().initWithID(documentId);
-                const keys = Object.keys(data);
-                for (let key of keys) {
-                    const item = data[key];
-                    newDoc.setValueForKey(item, key);
-                }
-                const action = new BatchAction();
-                action.type = BatchActionType.CREATE;
-                action.ios = newDoc;
-                resolve(action);
-            }
-        });
-    }
-
-    deleteDocument(documentId: string): Promise<any> {
-        return new Promise<any>((resolve, reject) => {
-            const doc = this.ios.documentWithID(documentId);
-            this.ios.deleteDocumentError(doc);
-            resolve();
-        });
-    }
-
-    deleteDocumentBatchAction(documentId: string): Promise<BatchAction> {
-        return new Promise<BatchAction>((resolve, reject) => {
-            const doc = this.ios.documentWithID(documentId);
-            const action = new BatchAction();
-            action.type = BatchActionType.DELETE;
-            action.ios = doc;
-            resolve(action);
-        });
-    }
-
-    destroyDatabase(): Promise<any> {
-        return new Promise<any>((resolve, reject) => {
-            this.ios.delete();
-            resolve();
-        });
-    }
-
-    createPullReplication(
-        remoteUrl: string
-    ) {
-        const url = NSURL.alloc().initWithString(remoteUrl);
-        const targetEndpoint = CBLURLEndpoint.alloc().initWithURL(url);
-        const replConfig = CBLReplicatorConfiguration.alloc().initWithDatabaseTarget(
-            this.ios,
-            targetEndpoint
-        );
-        replConfig.replicatorType = CBLReplicatorType.kCBLReplicatorTypePull;
-
-        const replicator = CBLReplicator.alloc().initWithConfig(replConfig);
-        return new Replicator(replicator);
-
-    }
-
-    createPushReplication(
-        remoteUrl: string
-    ) {
-        const url = NSURL.alloc().initWithString(remoteUrl);
-        const targetEndpoint = CBLURLEndpoint.alloc().initWithURL(url);
-        const replConfig = CBLReplicatorConfiguration.alloc().initWithDatabaseTarget(
-            this.ios,
-            targetEndpoint
-        );
-        replConfig.replicatorType = CBLReplicatorType.kCBLReplicatorTypePush;
-
-        const replicator = CBLReplicator.alloc().initWithConfig(replConfig);
-
-        return new Replicator(replicator);
-    }
-
-    addDatabaseChangeListener(callback: any): Promise<any> {
-        return new Promise((resolve, reject) => {
-            this.ios.addChangeListener((change: any) => {
-                if (callback && typeof callback === 'function') {
-                    const ids = [];
-                    const documentIds = change.documentIDs;
-                    const size = documentIds.count;
-                    for (let i = 0; i < size; i++) {
-                        const item = documentIds[i];
-                        ids.push(item);
-                    }
-                    callback(ids);
-                }
-            });
-            resolve();
-        });
-    }
-
-    private setComparision(item) {
-        let nativeQuery;
-        switch (item.comparison as QueryComparisonOperator) {
-            case 'equalTo':
-                nativeQuery = CBLQueryExpression.property(
-                    item.property
-                ).equalTo(CBLQueryExpression.value(item.value));
-                break;
-            case 'add':
-                nativeQuery = CBLQueryExpression.property(
-                    item.property
-                ).add(CBLQueryExpression.value(item.value));
-                break;
-            case 'between':
-                if (Array.isArray(item.value) && item.value.length === 2) {
-                    nativeQuery = CBLQueryExpression.property(
-                        item.property
-                    ).between(CBLQueryExpression.value(item.value[0])).andExpression(CBLQueryExpression.value(item.value[1]));
-                }
-                break;
-            case 'collate':
-                nativeQuery = CBLQueryExpression.property(
-                    item.property
-                ).collate(CBLQueryExpression.value(item.value));
-                break;
-            case 'divide':
-                nativeQuery = CBLQueryExpression.property(
-                    item.property
-                ).divide(CBLQueryExpression.value(item.value));
-                break;
-            case 'greaterThan':
-                nativeQuery = CBLQueryExpression.property(
-                    item.property
-                ).greaterThan(CBLQueryExpression.value(item.value));
-                break;
-            case 'greaterThanOrEqualTo':
-                nativeQuery = CBLQueryExpression.property(
-                    item.property
-                ).greaterThanOrEqualTo(CBLQueryExpression.value(item.value));
-                break;
-            case 'in':
-                const inArray = [];
-                if (Array.isArray(item.value)) {
-                    for (let exp of item.value) {
-                        inArray.push(CBLQueryExpression.value(exp));
-                    }
-                } else {
-                    inArray.push(CBLQueryExpression.value(item.value));
-                }
-                nativeQuery = CBLQueryExpression.property(item.property).in(
-                    inArray
-                );
-                break;
-            case 'is':
-                nativeQuery = CBLQueryExpression.property(item.property).is(
-                    CBLQueryExpression.value(item.value)
-                );
-                break;
-            case 'isNot':
-                nativeQuery = CBLQueryExpression.property(item.property).isNot(
-                    CBLQueryExpression.value(item.value)
-                );
-                break;
-            case 'isNullOrMissing':
-                nativeQuery = CBLQueryExpression.property(
-                    item.property
-                ).isNullOrMissing();
-                break;
-            case 'lessThan':
-                nativeQuery = CBLQueryExpression.property(
-                    item.property
-                ).lessThan(CBLQueryExpression.value(item.value));
-                break;
-            case 'lessThanOrEqualTo':
-                nativeQuery = CBLQueryExpression.property(
-                    item.property
-                ).lessThanOrEqualTo(CBLQueryExpression.value(item.value));
-                break;
-            case 'like':
-                nativeQuery = CBLQueryExpression.property(item.property).like(
-                    CBLQueryExpression.value(item.value)
-                );
-                break;
-            case 'modulo':
-                nativeQuery = CBLQueryExpression.property(item.property).modulo(
-                    CBLQueryExpression.value(item.value)
-                );
-                break;
-            case 'multiply':
-                nativeQuery = CBLQueryExpression.property(
-                    item.property
-                ).multiply(CBLQueryExpression.value(item.value));
-                break;
-
-            case 'notEqualTo':
-                nativeQuery = CBLQueryExpression.property(
-                    item.property
-                ).notEqualTo(CBLQueryExpression.value(item.value));
-                break;
-
-            case 'notNullOrMissing':
-                nativeQuery = CBLQueryExpression.property(
-                    item.property
-                ).notNullOrMissing();
-                break;
-            case 'regex':
-                nativeQuery = CBLQueryExpression.property(item.property).regex(
-                    CBLQueryExpression.value(item.value)
-                );
-                break;
-        }
-        return nativeQuery;
-    }
-
-    query(query: Query = {select: [QueryMeta.ALL, QueryMeta.ID]}): Promise<any> {
-        const items = [];
-        let select = [];
-        let from;
-        let join = null;
-        let where;
-        let groupBy = null;
-        let orderBy = null;
-        let limit = null;
-        let having = null;
-        if (!query.select || query.select.length === 0) {
-            select.push(CBLQuerySelectResult.all());
-            select.push(CBLQuerySelectResult.expression(CBLQueryMeta.id()));
+        object.setDictionaryForKey(nativeObject, key);
+        break;
+      case 'number':
+        if (this.numberIs64Bit(item)) {
+          if (this.numberHasDecimals(item)) {
+            object.setDoubleForKey(item, key);
+          } else {
+            object.setLongLongForKey(item, key);
+          }
         } else {
-            query.select.forEach(item => {
-                if (item === QueryMeta.ID) {
-                    select.push(CBLQuerySelectResult.expression(CBLQueryMeta.id()));
-                } else if (item === QueryMeta.ALL) {
-                    select.push(CBLQuerySelectResult.all());
-                } else {
-                    select.push(CBLQueryExpression.property(item));
-                }
-            });
+          if (this.numberHasDecimals(item)) {
+            object.setFloatForKey(item, key);
+          } else {
+            object.setIntegerForKey(item, key);
+          }
+        }
+        break;
+      case 'boolean':
+        object.setBooleanForKey(item, key);
+        break;
+      default:
+        object.setValueForKey(item, key);
+    }
+  }
+
+  private serializeArray(item, array: any) {
+    if (item === null) {
+      return;
+    }
+
+    switch (typeof item) {
+      case 'object':
+        if (item instanceof Date) {
+          array.addDate(this.fromISO8601UTC(item.toISOString()));
+          return;
         }
 
-        if (query.from) {
-            const db = new Couchbase(query.from);
-            from = CBLQueryDataSource.database(db.ios);
+        if (Array.isArray(item)) {
+          const nativeArray = CBLMutableArray.new();
+          item.forEach((data) => {
+            this.serializeArray(data, nativeArray);
+          });
+          array.addArray(nativeArray);
+          return;
+        }
+
+        const object = CBLMutableDictionary.new();
+        Object.keys(item).forEach((itemKey) => {
+          const obj = item[itemKey];
+          this.serializeObject(obj, object, itemKey);
+        });
+        array.addDictionary(object);
+        break;
+      case 'number':
+        if (this.numberIs64Bit(item)) {
+          if (this.numberHasDecimals(item)) {
+            array.addDouble(item);
+          } else {
+            array.addLongLong(item);
+          }
         } else {
-            from = CBLQueryDataSource.database(this.ios);
+          if (this.numberHasDecimals(item)) {
+            array.addFloat(item);
+          } else {
+            array.addInteger(item);
+          }
+        }
+        break;
+      case 'boolean':
+        array.addBoolean(item);
+        break;
+      default:
+        array.addValue(item);
+    }
+  }
+
+  private serialize(item, doc: any, key) {
+    if (item === null) {
+      return;
+    }
+
+    switch (typeof item) {
+      case 'object':
+        if (item instanceof Date) {
+          doc.setDateForKey(this.fromISO8601UTC(item.toISOString()), key);
+          return;
         }
 
-        let nativeQuery = null;
-        if (query.where) {
-            for (let item of query.where) {
-                if (item.logical === QueryLogicalOperator.AND) {
-                    if (!nativeQuery) break;
-                    nativeQuery = nativeQuery.andExpression(this.setComparision(item));
-                } else if (item.logical === QueryLogicalOperator.OR) {
-                    if (!nativeQuery) break;
-                    nativeQuery = nativeQuery.orExpression(this.setComparision(item));
-                } else {
-                    nativeQuery = this.setComparision(item);
-                }
-            }
+        if (Array.isArray(item)) {
+          const array = CBLMutableArray.new();
+          item.forEach((data) => {
+            this.serializeArray(data, array);
+          });
+          doc.setArrayForKey(array, key);
+          return;
         }
 
-        if (query.groupBy) {
-            if (query.groupBy.length > 0) {
-                groupBy = [];
-            }
-            for (let prop of query.groupBy) {
-                groupBy.push(CBLQueryExpression.property(prop));
-            }
+        const object = CBLMutableDictionary.new();
+        Object.keys(item).forEach((itemKey) => {
+          const obj = item[itemKey];
+          this.serializeObject(obj, object, itemKey);
+        });
+        doc.setDictionaryForKey(object, key);
+        break;
+      case 'number':
+        if (this.numberIs64Bit(item)) {
+          if (this.numberHasDecimals(item)) {
+            doc.setDoubleForKey(item, key);
+          } else {
+            doc.setLongLongForKey(item, key);
+          }
+        } else {
+          if (this.numberHasDecimals(item)) {
+            doc.setFloatForKey(item, key);
+          } else {
+            doc.setIntegerForKey(item, key);
+          }
         }
-        if (query.order) {
-            if (query.order.length > 0) {
-                orderBy = [];
-            }
-            for (let item of query.order) {
-                switch (item.direction) {
-                    case 'desc':
-                        orderBy.push(CBLQueryOrdering.property(item.property).descending());
-                        break;
-                    default:
-                        orderBy.push(CBLQueryOrdering.property(item.property).ascending());
-                        break;
-                }
-            }
-        }
+        break;
+      case 'boolean':
+        doc.setBooleanForKey(item, key);
+        break;
+      default:
+        doc.setValueForKey(item, key);
+    }
+  }
 
-        if (query.limit && typeof query.limit === 'number') {
-            if (query.offset && typeof query.offset === 'number') {
-                limit = CBLQueryLimit.limitOffset(CBLQueryExpression.integer(query.limit), CBLQueryExpression.integer(query.offset));
-            } else {
-                limit = CBLQueryLimit.limit(CBLQueryExpression.integer(query.limit));
-            }
-        }
-
-        let queryBuilder = CBLQueryBuilder.selectFromJoinWhereGroupByHavingOrderByLimit(
-            select,
-            from,
-            join,
-            nativeQuery,
-            groupBy,
-            having,
-            orderBy,
-            limit
-        );
-
-        const result = queryBuilder.execute().allResults();
-        const size = result.count;
+  getDocument(documentId: string): Promise<any> {
+    return new Promise<any>((resolve, reject) => {
+      const doc = this.ios.documentWithID(documentId);
+      if (doc) {
+        let obj = {};
+        const keys = doc.keys;
+        const size = keys.count;
+        obj['id'] = doc.id;
         for (let i = 0; i < size; i++) {
-            const item = result.objectAtIndex(i);
-            const keys = item.keys;
-            const keysSize = keys.count;
-            const obj = {};
-            for (let keyId = 0; keyId < keysSize; keyId++) {
-                const key = keys.objectAtIndex(keyId);
-                const nativeItem = item.valueForKey(key);
-                if (typeof nativeItem === 'string') {
-                    obj[key] = nativeItem;
-                } else if (types.getClass(nativeItem) === 'CBLDictionary') {
-                    const cblKeys = nativeItem.keys;
-                    const cblKeysSize = cblKeys.count;
-                    for (let cblKeysId = 0; cblKeysId < cblKeysSize; cblKeysId++) {
-                        const cblKey = cblKeys.objectAtIndex(cblKeysId);
-                        obj[cblKey] = this.deserialize(nativeItem.valueForKey(cblKey));
-                    }
-                }
-            }
-            items.push(obj);
+          const key = keys.objectAtIndex(i);
+          const value = doc.valueForKey(key);
+          const newValue = {};
+          newValue[key] = this.deserialize(value);
+          obj = Object.assign(obj, newValue);
         }
-        return Promise.resolve(items);
+        return resolve(obj);
+      }
+      return resolve(null);
+    });
+  }
+
+  numberHasDecimals(item: number) {
+    return !(item % 1 === 0);
+  }
+
+  numberIs64Bit(item: number) {
+    return item < -Math.pow(2, 31) + 1 || item > Math.pow(2, 31) - 1;
+  }
+
+  private deserialize(data: any) {
+    if (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean' || typeof data !== 'object') return data;
+
+    if (types.isNullOrUndefined(data)) {
+      return data;
     }
+
+    if (data instanceof NSNull) {
+      return null;
+    }
+
+    if (data instanceof CBLDictionary) {
+      const keys = data.keys;
+      const length = keys.count;
+      const object = {};
+      for (let i = 0; i < length; i++) {
+        const key = keys.objectAtIndex(i);
+        const nativeItem = data.valueForKey(key);
+        object[key] = this.deserialize(nativeItem);
+      }
+      return object;
+    }
+
+    if (data instanceof CBLArray) {
+      const array = [];
+      const size = data.count;
+      for (let i = 0; i < size; i++) {
+        const nativeItem = data.valueAtIndex(i);
+        const item = this.deserialize(nativeItem);
+        array.push(item);
+      }
+      return array;
+    }
+
+    return data;
+  }
+
+  updateDocument(documentId: string, data: any): Promise<any> {
+    return new Promise<any>((resolve, reject) => {
+      const original = this.ios.documentWithID(documentId);
+      if (original) {
+        const newDoc = original.toMutable();
+        const keys = Object.keys(data);
+        for (let key of keys) {
+          const item = data[key];
+          newDoc.setValueForKey(item, key);
+        }
+        this.ios.saveDocumentError(newDoc);
+      }
+      resolve();
+    });
+  }
+
+  updateDocumentBatchAction(documentId: string, data: any): Promise<BatchAction> {
+    return new Promise<BatchAction>((resolve, reject) => {
+      const original = this.ios.documentWithID(documentId);
+      if (original) {
+        const newDoc = original.toMutable();
+        const keys = Object.keys(data);
+        for (let key of keys) {
+          const item = data[key];
+          newDoc.setValueForKey(item, key);
+        }
+        const action = new BatchAction();
+        action.type = BatchActionType.UPDATE;
+        action.ios = newDoc;
+        resolve(action);
+      } else {
+        resolve(null);
+      }
+    });
+  }
+
+  upsertDocument(documentId: string, data: any): Promise<any> {
+    return new Promise<any>((resolve, reject) => {
+      let doc;
+      const original = this.ios.documentWithID(documentId);
+      if (original) {
+        doc = original.toMutable();
+      } else {
+        doc = CBLMutableDocument.alloc().initWithID(documentId);
+      }
+      const keys = Object.keys(data);
+      for (let key of keys) {
+        const item = data[key];
+        doc.setValueForKey(item, key);
+      }
+      this.ios.saveDocumentError(doc);
+      resolve();
+    });
+  }
+
+  upsertDocumentBatchAction(documentId: string, data: any): Promise<BatchAction> {
+    return new Promise<BatchAction>((resolve, reject) => {
+      const original = this.ios.documentWithID(documentId);
+      if (original) {
+        const newDoc = original.toMutable();
+        const keys = Object.keys(data);
+        for (let key of keys) {
+          const item = data[key];
+          newDoc.setValueForKey(item, key);
+        }
+        const action = new BatchAction();
+        action.type = BatchActionType.UPDATE;
+        action.ios = newDoc;
+        resolve(action);
+      } else {
+        const newDoc = CBLMutableDocument.alloc().initWithID(documentId);
+        const keys = Object.keys(data);
+        for (let key of keys) {
+          const item = data[key];
+          newDoc.setValueForKey(item, key);
+        }
+        const action = new BatchAction();
+        action.type = BatchActionType.CREATE;
+        action.ios = newDoc;
+        resolve(action);
+      }
+    });
+  }
+
+  deleteDocument(documentId: string): Promise<any> {
+    return new Promise<any>((resolve, reject) => {
+      const doc = this.ios.documentWithID(documentId);
+      if (doc) {
+        this.ios.deleteDocumentError(doc);
+        resolve();
+      } else {
+        resolve();
+      }
+    });
+  }
+
+  deleteDocumentBatchAction(documentId: string): Promise<BatchAction> {
+    return new Promise<BatchAction>((resolve, reject) => {
+      const doc = this.ios.documentWithID(documentId);
+      if (doc) {
+        const action = new BatchAction();
+        action.type = BatchActionType.DELETE;
+        action.ios = doc;
+        resolve(action);
+      } else {
+        resolve(null);
+      }
+    });
+  }
+
+  destroyDatabase(): Promise<any> {
+    return new Promise<any>((resolve, reject) => {
+      this.ios.delete();
+      resolve();
+    });
+  }
+
+  createPullReplication(
+    remoteUrl: string
+  ) {
+    const url = NSURL.alloc().initWithString(remoteUrl);
+    const targetEndpoint = CBLURLEndpoint.alloc().initWithURL(url);
+    const replConfig = CBLReplicatorConfiguration.alloc().initWithDatabaseTarget(
+      this.ios,
+      targetEndpoint
+    );
+    replConfig.replicatorType = CBLReplicatorType.kCBLReplicatorTypePull;
+
+    const replicator = CBLReplicator.alloc().initWithConfig(replConfig);
+    return new Replicator(replicator);
+
+  }
+
+  createPushReplication(
+    remoteUrl: string
+  ) {
+    const url = NSURL.alloc().initWithString(remoteUrl);
+    const targetEndpoint = CBLURLEndpoint.alloc().initWithURL(url);
+    const replConfig = CBLReplicatorConfiguration.alloc().initWithDatabaseTarget(
+      this.ios,
+      targetEndpoint
+    );
+    replConfig.replicatorType = CBLReplicatorType.kCBLReplicatorTypePush;
+
+    const replicator = CBLReplicator.alloc().initWithConfig(replConfig);
+
+    return new Replicator(replicator);
+  }
+
+  addDatabaseChangeListener(callback: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.ios.addChangeListener((change: any) => {
+        if (callback && typeof callback === 'function') {
+          const ids = [];
+          const documentIds = change.documentIDs;
+          const size = documentIds.count;
+          for (let i = 0; i < size; i++) {
+            const item = documentIds[i];
+            ids.push(item);
+          }
+          callback(ids);
+        }
+      });
+      resolve();
+    });
+  }
+
+  private setComparision(item) {
+    let nativeQuery;
+    switch (item.comparison as QueryComparisonOperator) {
+      case 'equalTo':
+        nativeQuery = CBLQueryExpression.property(
+          item.property
+        ).equalTo(CBLQueryExpression.value(item.value));
+        break;
+      case 'add':
+        nativeQuery = CBLQueryExpression.property(
+          item.property
+        ).add(CBLQueryExpression.value(item.value));
+        break;
+      case 'between':
+        if (Array.isArray(item.value) && item.value.length === 2) {
+          nativeQuery = CBLQueryExpression.property(
+            item.property
+          ).between(CBLQueryExpression.value(item.value[0])).andExpression(CBLQueryExpression.value(item.value[1]));
+        }
+        break;
+      case 'collate':
+        nativeQuery = CBLQueryExpression.property(
+          item.property
+        ).collate(CBLQueryExpression.value(item.value));
+        break;
+      case 'divide':
+        nativeQuery = CBLQueryExpression.property(
+          item.property
+        ).divide(CBLQueryExpression.value(item.value));
+        break;
+      case 'greaterThan':
+        nativeQuery = CBLQueryExpression.property(
+          item.property
+        ).greaterThan(CBLQueryExpression.value(item.value));
+        break;
+      case 'greaterThanOrEqualTo':
+        nativeQuery = CBLQueryExpression.property(
+          item.property
+        ).greaterThanOrEqualTo(CBLQueryExpression.value(item.value));
+        break;
+      case 'in':
+        const inArray = [];
+        if (Array.isArray(item.value)) {
+          for (let exp of item.value) {
+            inArray.push(CBLQueryExpression.value(exp));
+          }
+        } else {
+          inArray.push(CBLQueryExpression.value(item.value));
+        }
+        nativeQuery = CBLQueryExpression.property(item.property).in(
+          inArray
+        );
+        break;
+      case 'is':
+        nativeQuery = CBLQueryExpression.property(item.property).is(
+          CBLQueryExpression.value(item.value)
+        );
+        break;
+      case 'isNot':
+        nativeQuery = CBLQueryExpression.property(item.property).isNot(
+          CBLQueryExpression.value(item.value)
+        );
+        break;
+      case 'isNullOrMissing':
+        nativeQuery = CBLQueryExpression.property(
+          item.property
+        ).isNullOrMissing();
+        break;
+      case 'lessThan':
+        nativeQuery = CBLQueryExpression.property(
+          item.property
+        ).lessThan(CBLQueryExpression.value(item.value));
+        break;
+      case 'lessThanOrEqualTo':
+        nativeQuery = CBLQueryExpression.property(
+          item.property
+        ).lessThanOrEqualTo(CBLQueryExpression.value(item.value));
+        break;
+      case 'like':
+        nativeQuery = CBLQueryExpression.property(item.property).like(
+          CBLQueryExpression.value(item.value)
+        );
+        break;
+      case 'modulo':
+        nativeQuery = CBLQueryExpression.property(item.property).modulo(
+          CBLQueryExpression.value(item.value)
+        );
+        break;
+      case 'multiply':
+        nativeQuery = CBLQueryExpression.property(
+          item.property
+        ).multiply(CBLQueryExpression.value(item.value));
+        break;
+
+      case 'notEqualTo':
+        nativeQuery = CBLQueryExpression.property(
+          item.property
+        ).notEqualTo(CBLQueryExpression.value(item.value));
+        break;
+
+      case 'notNullOrMissing':
+        nativeQuery = CBLQueryExpression.property(
+          item.property
+        ).notNullOrMissing();
+        break;
+      case 'regex':
+        nativeQuery = CBLQueryExpression.property(item.property).regex(
+          CBLQueryExpression.value(item.value)
+        );
+        break;
+    }
+    return nativeQuery;
+  }
+
+  query(query: Query = {select: [QueryMeta.ALL, QueryMeta.ID]}): Promise<any> {
+    const items = [];
+    let select = [];
+    let from;
+    let join = null;
+    let where;
+    let groupBy = null;
+    let orderBy = null;
+    let limit = null;
+    let having = null;
+    if (!query.select || query.select.length === 0) {
+      select.push(CBLQuerySelectResult.all());
+      select.push(CBLQuerySelectResult.expression(CBLQueryMeta.id()));
+    } else {
+      query.select.forEach(item => {
+        if (item === QueryMeta.ID) {
+          select.push(CBLQuerySelectResult.expression(CBLQueryMeta.id()));
+        } else if (item === QueryMeta.ALL) {
+          select.push(CBLQuerySelectResult.all());
+        } else {
+          select.push(CBLQueryExpression.property(item));
+        }
+      });
+    }
+
+    if (query.from) {
+      const db = new Couchbase(query.from);
+      from = CBLQueryDataSource.database(db.ios);
+    } else {
+      from = CBLQueryDataSource.database(this.ios);
+    }
+
+    let nativeQuery = null;
+    if (query.where) {
+      for (let item of query.where) {
+        if (item.logical === QueryLogicalOperator.AND) {
+          if (!nativeQuery) break;
+          nativeQuery = nativeQuery.andExpression(this.setComparision(item));
+        } else if (item.logical === QueryLogicalOperator.OR) {
+          if (!nativeQuery) break;
+          nativeQuery = nativeQuery.orExpression(this.setComparision(item));
+        } else {
+          nativeQuery = this.setComparision(item);
+        }
+      }
+    }
+
+    if (query.groupBy) {
+      if (query.groupBy.length > 0) {
+        groupBy = [];
+      }
+      for (let prop of query.groupBy) {
+        groupBy.push(CBLQueryExpression.property(prop));
+      }
+    }
+    if (query.order) {
+      if (query.order.length > 0) {
+        orderBy = [];
+      }
+      for (let item of query.order) {
+        switch (item.direction) {
+          case 'desc':
+            orderBy.push(CBLQueryOrdering.property(item.property).descending());
+            break;
+          default:
+            orderBy.push(CBLQueryOrdering.property(item.property).ascending());
+            break;
+        }
+      }
+    }
+
+    if (query.limit && typeof query.limit === 'number') {
+      if (query.offset && typeof query.offset === 'number') {
+        limit = CBLQueryLimit.limitOffset(CBLQueryExpression.integer(query.limit), CBLQueryExpression.integer(query.offset));
+      } else {
+        limit = CBLQueryLimit.limit(CBLQueryExpression.integer(query.limit));
+      }
+    }
+
+    let queryBuilder = CBLQueryBuilder.selectFromJoinWhereGroupByHavingOrderByLimit(
+      select,
+      from,
+      join,
+      nativeQuery,
+      groupBy,
+      having,
+      orderBy,
+      limit
+    );
+
+    const result = queryBuilder.execute().allResults();
+    const size = result.count;
+    for (let i = 0; i < size; i++) {
+      const item = result.objectAtIndex(i);
+      const keys = item.keys;
+      const keysSize = keys.count;
+      const obj = {};
+      for (let keyId = 0; keyId < keysSize; keyId++) {
+        const key = keys.objectAtIndex(keyId);
+        const nativeItem = item.valueForKey(key);
+        if (typeof nativeItem === 'string') {
+          obj[key] = nativeItem;
+        } else if (types.getClass(nativeItem) === 'CBLDictionary') {
+          const cblKeys = nativeItem.keys;
+          const cblKeysSize = cblKeys.count;
+          for (let cblKeysId = 0; cblKeysId < cblKeysSize; cblKeysId++) {
+            const cblKey = cblKeys.objectAtIndex(cblKeysId);
+            obj[cblKey] = this.deserialize(nativeItem.valueForKey(cblKey));
+          }
+        }
+      }
+      items.push(obj);
+    }
+    return Promise.resolve(items);
+  }
 }
 
 export class Replicator extends ReplicatorBase {
-    constructor(replicator: any) {
-        super(replicator);
-    }
+  constructor(replicator: any) {
+    super(replicator);
+  }
 
-    start() {
-        this.replicator.start();
-    }
+  start() {
+    this.replicator.start();
+  }
 
-    stop() {
-        this.replicator.stop();
-    }
+  stop() {
+    this.replicator.stop();
+  }
 
-    isRunning() {
-        return (
-            this.replicator.status.activity ===
-            CBLReplicatorActivityLevel.kCBLReplicatorBusy
-        );
-    }
+  isRunning() {
+    return (
+      this.replicator.status.activity ===
+      CBLReplicatorActivityLevel.kCBLReplicatorBusy
+    );
+  }
 
-    setContinuous(isContinuous: boolean) {
-        const newConfig = CBLReplicatorConfiguration.alloc().initWithConfig(this.replicator.config);
-        newConfig.continuous = isContinuous;
-        this.replicator = CBLReplicator.alloc().initWithConfig(newConfig);
-    }
+  setContinuous(isContinuous: boolean) {
+    const newConfig = CBLReplicatorConfiguration.alloc().initWithConfig(this.replicator.config);
+    newConfig.continuous = isContinuous;
+    this.replicator = CBLReplicator.alloc().initWithConfig(newConfig);
+  }
 
-    setUserNameAndPassword(username: string, password: string) {
-        const newConfig = CBLReplicatorConfiguration.alloc().initWithConfig(this.replicator.config);
-        newConfig.authenticator = CBLBasicAuthenticator.alloc().initWithUsernamePassword(
-            username,
-            password
-        );
-        this.replicator = CBLReplicator.alloc().initWithConfig(newConfig);
-    }
+  setUserNameAndPassword(username: string, password: string) {
+    const newConfig = CBLReplicatorConfiguration.alloc().initWithConfig(this.replicator.config);
+    newConfig.authenticator = CBLBasicAuthenticator.alloc().initWithUsernamePassword(
+      username,
+      password
+    );
+    this.replicator = CBLReplicator.alloc().initWithConfig(newConfig);
+  }
 
-    setSessionIdAndCookieName(sessionId: string, cookieName: string) {
-        const newConfig = CBLReplicatorConfiguration.alloc().initWithConfig(this.replicator.config);
-        newConfig.authenticator = CBLSessionAuthenticator.alloc().initWithSessionIDCookieName(
-            sessionId,
-            cookieName
-        );
-        this.replicator = CBLReplicator.alloc().initWithConfig(newConfig);
-    }
+  setSessionIdAndCookieName(sessionId: string, cookieName: string) {
+    const newConfig = CBLReplicatorConfiguration.alloc().initWithConfig(this.replicator.config);
+    newConfig.authenticator = CBLSessionAuthenticator.alloc().initWithSessionIDCookieName(
+      sessionId,
+      cookieName
+    );
+    this.replicator = CBLReplicator.alloc().initWithConfig(newConfig);
+  }
 
-    setSessionId(sessionId: string) {
-        const newConfig = CBLReplicatorConfiguration.alloc().initWithConfig(this.replicator.config);
-        newConfig.authenticator = CBLSessionAuthenticator.alloc().initWithSessionID(
-            sessionId
-        );
-        this.replicator = CBLReplicator.alloc().initWithConfig(newConfig);
-    }
+  setSessionId(sessionId: string) {
+    const newConfig = CBLReplicatorConfiguration.alloc().initWithConfig(this.replicator.config);
+    newConfig.authenticator = CBLSessionAuthenticator.alloc().initWithSessionID(
+      sessionId
+    );
+    this.replicator = CBLReplicator.alloc().initWithConfig(newConfig);
+  }
 }

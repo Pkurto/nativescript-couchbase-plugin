@@ -3,6 +3,10 @@ export abstract class Common {
     android: any;
     config: any;
 
+    public static setLogLevel(domain: LogDomain, level: LogLevel) {
+
+    }
+
     constructor(databaseName: string) {
     }
 
@@ -131,4 +135,21 @@ export interface QueryWhereItem {
 export interface QueryOrderItem {
     property: string;
     direction: 'asc' | 'desc';
+}
+
+export enum LogDomain {
+  ALL = 'ALL',
+  DATABASE = 'DATABASE',
+  QUERY = 'QUERY',
+  REPLICATOR = 'REPLICATOR',
+  NETWORK = 'NETWORK'
+}
+
+export enum LogLevel {
+  DEBUG = 'DEBUG',
+  VERBOSE = 'VERBOSE',
+  INFO = 'INFO',
+  WARNING = 'WARNING',
+  ERROR = 'ERROR',
+  NONE = 'NONE'
 }
