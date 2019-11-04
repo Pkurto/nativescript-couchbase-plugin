@@ -1,0 +1,6 @@
+framework module CouchbaseLiteSwiftThreaded {
+  umbrella header "CouchbaseLiteSwiftThreaded-umbrella.h"
+
+  export *
+  module * { export * }
+}

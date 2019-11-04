@@ -1,0 +1,24 @@
+PODS:
+  - CouchbaseLite (2.1.3)
+  - CouchbaseLiteSwiftThreaded (1.0.9):
+    - CouchbaseLite (~> 2.1.3)
+
+DEPENDENCIES:
+  - CouchbaseLite (~> 2.1.1)
+  - CouchbaseLiteSwiftThreaded (from `../`)
+
+SPEC REPOS:
+  https://github.com/cocoapods/specs.git:
+    - CouchbaseLite
+
+EXTERNAL SOURCES:
+  CouchbaseLiteSwiftThreaded:
+    :path: "../"
+
+SPEC CHECKSUMS:
+  CouchbaseLite: 3c539931e1645ea817ed73ce8e0a9bb1b96e763b
+  CouchbaseLiteSwiftThreaded: 2de78af39d727458cd52e755911173dc2e6dbba1
+
+PODFILE CHECKSUM: 6bee04606417a88eaccdef8dc8bcf221b40607c8
+
+COCOAPODS: 1.6.1

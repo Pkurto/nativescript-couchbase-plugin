@@ -1,0 +1,14 @@
+use_frameworks!
+
+target 'CouchbaseLiteSwiftThreaded_Example' do
+  pod 'CouchbaseLiteSwiftThreaded', :path => '../'
+
+  use_frameworks!
+  pod 'CouchbaseLite', '~> 2.1.1'
+
+  target 'CouchbaseLiteSwiftThreaded_Tests' do
+    inherit! :search_paths
+
+    
+  end
+end
